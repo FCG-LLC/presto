@@ -62,6 +62,12 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>jnanomsg</groupId>
+            <artifactId>jnanomsg</artifactId>
+            <version>0.4.3</version>
+        </dependency>
+
         <!-- Presto SPI -->
         <dependency>
             <groupId>com.facebook.presto</groupId>
@@ -112,4 +118,10 @@
         </dependency>
     </dependencies>
 
+    <repositories>
+        <repository>
+            <id>clojars.org</id>
+            <url>http://clojars.org/repo</url>
+        </repository>
+    </repositories>
 </project>
