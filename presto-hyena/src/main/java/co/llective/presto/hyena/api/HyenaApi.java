@@ -21,6 +21,7 @@ public class HyenaApi {
     }
 
     public static class ScanFilter {
+        int column;
         ScanComparison op;
         long value;
     }
@@ -77,6 +78,7 @@ public class HyenaApi {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(baos);
 
+        dos.writeInt(filter.column);
         dos.writeInt(filter.op.ordinal());
         dos.writeLong(filter.value);
 

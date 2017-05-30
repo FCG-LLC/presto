@@ -17,6 +17,7 @@ public class TestHyenaApi {
     @BeforeTest
     public void setUp() {
         filter.op = HyenaApi.ScanComparison.GtEq;
+        filter.column = 2;
         filter.value = 1000;
 
         req.min_ts = 100;
@@ -29,7 +30,7 @@ public class TestHyenaApi {
     public void testFilterEncoding() throws Exception {
         byte[] encoded = api.encodeScanFilter(filter);
         byte[] expected = new byte[] {
-                3, 0, 0, 0, (byte) 232, 3, 0, 0, 0, 0, 0, 0
+                2, 0, 0, 0, 3, 0, 0, 0, (byte) 232, 3, 0, 0, 0, 0, 0, 0
         };
 
         assertArrayEquals(expected, encoded);
@@ -39,7 +40,7 @@ public class TestHyenaApi {
     public void testRequestEncoding() throws Exception {
         byte[] encoded = api.encodeScanRequest(req);
         byte[] expected = new byte[] {
-                100, 0, 0, 0, 0, 0, 0, 0, (byte) 200, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, (byte) 232, 3, 0, 0, 0, 0, 0, 0
+                100, 0, 0, 0, 0, 0, 0, 0, (byte) 200, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, (byte) 232, 3, 0, 0, 0, 0, 0, 0
         };
 
         assertArrayEquals(expected, encoded);
