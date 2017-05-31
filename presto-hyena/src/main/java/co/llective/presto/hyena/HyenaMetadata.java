@@ -11,7 +11,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharType;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
@@ -22,12 +21,12 @@ public class HyenaMetadata
     public static final String PRESTO_HYENA_SCHEMA = "hyena";
     private static final List<String> SCHEMA_NAMES = ImmutableList.of(PRESTO_HYENA_SCHEMA);
 
-    private final HyenaTables localFileTables;
+    private final HyenaTables hyenaTables;
 
     @Inject
-    public HyenaMetadata(HyenaTables localFileTables)
+    public HyenaMetadata(HyenaTables hyenaTables)
     {
-        this.localFileTables = requireNonNull(localFileTables, "localFileTables is null");
+        this.hyenaTables = requireNonNull(hyenaTables, "hyenaTables is null");
     }
 
     @Override
@@ -40,20 +39,20 @@ public class HyenaMetadata
     public ConnectorTableHandle getTableHandle(ConnectorSession session, SchemaTableName tableName)
     {
         requireNonNull(tableName, "tableName is null");
-        return localFileTables.getTable(tableName);
+        return hyenaTables.getTable(tableName);
     }
 
     @Override
     public ConnectorTableMetadata getTableMetadata(ConnectorSession session, ConnectorTableHandle table)
     {
         HyenaTableHandle tableHandle = (HyenaTableHandle) table;
-        return new ConnectorTableMetadata(tableHandle.getSchemaTableName(), localFileTables.getColumns(tableHandle));
+        return new ConnectorTableMetadata(tableHandle.getSchemaTableName(), hyenaTables.getColumns(tableHandle));
     }
 
     @Override
     public List<SchemaTableName> listTables(ConnectorSession session, String schemaNameOrNull)
     {
-        return localFileTables.getTables();
+        return hyenaTables.getTables();
     }
 
     @Override
@@ -82,7 +81,7 @@ public class HyenaMetadata
     {
         ImmutableMap.Builder<String, ColumnHandle> columnHandles = ImmutableMap.builder();
         int index = 0;
-        for (ColumnMetadata column : localFileTables.getColumns(tableHandle)) {
+        for (ColumnMetadata column : hyenaTables.getColumns(tableHandle)) {
             columnHandles.put(column.getName(), new HyenaColumnHandle(column.getName(), column.getType(), index));
             index++;
         }
@@ -101,9 +100,9 @@ public class HyenaMetadata
         requireNonNull(prefix, "prefix is null");
         ImmutableMap.Builder<SchemaTableName, List<ColumnMetadata>> columns = ImmutableMap.builder();
         for (SchemaTableName tableName : listTables(session, prefix)) {
-            HyenaTableHandle tableHandle = localFileTables.getTable(tableName);
+            HyenaTableHandle tableHandle = hyenaTables.getTable(tableName);
             if (tableHandle != null) {
-                columns.put(tableName, localFileTables.getColumns(tableHandle));
+                columns.put(tableName, hyenaTables.getColumns(tableHandle));
             }
         }
         return columns.build();

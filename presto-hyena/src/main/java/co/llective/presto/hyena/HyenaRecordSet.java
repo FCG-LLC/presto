@@ -20,10 +20,10 @@ public class HyenaRecordSet
     private final List<Type> columnTypes;
     private final HostAddress address;
     private final TupleDomain<HyenaColumnHandle> effectivePredicate;
-    private final SchemaTableName tableName;
-    private final HyenaTables localFileTables;
+    private final Long partitionId;
+    private final HyenaSession hyenaSession;
 
-    public HyenaRecordSet(HyenaTables localFileTables, HyenaSplit split, List<HyenaColumnHandle> columns)
+    public HyenaRecordSet(HyenaSession hyenaSession, HyenaSplit split, List<HyenaColumnHandle> columns)
     {
         this.columns = requireNonNull(columns, "column handles is null");
         requireNonNull(split, "split is null");
@@ -35,9 +35,9 @@ public class HyenaRecordSet
         this.columnTypes = types.build();
         this.address = Iterables.getOnlyElement(split.getAddresses());
         this.effectivePredicate = split.getEffectivePredicate();
-        this.tableName = split.getTableName();
+        this.partitionId = split.getPartitionId();
 
-        this.localFileTables = requireNonNull(localFileTables, "localFileTables is null");
+        this.hyenaSession = requireNonNull(hyenaSession, "hyenaSession is null");
     }
 
     @Override
@@ -49,7 +49,7 @@ public class HyenaRecordSet
     @Override
     public RecordCursor cursor()
     {
-        return new HyenaRecordCursor(localFileTables, columns, tableName, address, effectivePredicate);
+        return new HyenaRecordCursor(hyenaSession, columns, address, partitionId, effectivePredicate);
     }
 }
 
