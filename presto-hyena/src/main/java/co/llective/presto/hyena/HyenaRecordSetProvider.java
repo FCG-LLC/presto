@@ -17,25 +17,27 @@ public class HyenaRecordSetProvider
         implements ConnectorRecordSetProvider
 {
     private final HyenaTables localFileTables;
+    private final HyenaSession hyenaSession;
 
     @Inject
-    public HyenaRecordSetProvider(HyenaTables localFileTables)
+    public HyenaRecordSetProvider(HyenaTables hyenaTables, HyenaSession session)
     {
-        this.localFileTables = requireNonNull(localFileTables, "localFileTables is null");
+        this.localFileTables = requireNonNull(hyenaTables, "localFileTables is null");
+        this.hyenaSession = requireNonNull(session, "hyenaSession is null");
     }
 
     @Override
     public RecordSet getRecordSet(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorSplit split, List<? extends ColumnHandle> columns)
     {
         requireNonNull(split, "split is null");
-        HyenaSplit localFileSplit = (HyenaSplit) split;
+        HyenaSplit hyenaSplit = (HyenaSplit) split;
 
         ImmutableList.Builder<HyenaColumnHandle> handles = ImmutableList.builder();
         for (ColumnHandle handle : columns) {
             handles.add((HyenaColumnHandle) handle);
         }
 
-        return new HyenaRecordSet(localFileTables, localFileSplit, handles.build());
+        return new HyenaRecordSet(hyenaSession, hyenaSplit, handles.build());
     }
 }
 

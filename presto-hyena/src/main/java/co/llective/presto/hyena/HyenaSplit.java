@@ -17,17 +17,17 @@ public class HyenaSplit
         implements ConnectorSplit
 {
     private final HostAddress address;
-    private final SchemaTableName tableName;
+    private final Long partitionId;
     private final TupleDomain<HyenaColumnHandle> effectivePredicate;
 
     @JsonCreator
     public HyenaSplit(
             @JsonProperty("address") HostAddress address,
-            @JsonProperty("tableName") SchemaTableName tableName,
+            @JsonProperty("partitionId") Long partitionId,
             @JsonProperty("effectivePredicate") TupleDomain<HyenaColumnHandle> effectivePredicate)
     {
         this.address = requireNonNull(address, "address is null");
-        this.tableName = requireNonNull(tableName, "tableName is null");
+        this.partitionId = requireNonNull(partitionId, "partitionId is null");
         this.effectivePredicate = requireNonNull(effectivePredicate, "effectivePredicate is null");
     }
 
@@ -38,10 +38,7 @@ public class HyenaSplit
     }
 
     @JsonProperty
-    public SchemaTableName getTableName()
-    {
-        return tableName;
-    }
+    public Long getPartitionId() { return partitionId; }
 
     @JsonProperty
     public TupleDomain<HyenaColumnHandle> getEffectivePredicate()
@@ -72,7 +69,7 @@ public class HyenaSplit
     {
         return toStringHelper(this)
                 .add("address", address)
-                .add("tableName", tableName)
+                .add("partitionId", partitionId)
                 .toString();
     }
 }

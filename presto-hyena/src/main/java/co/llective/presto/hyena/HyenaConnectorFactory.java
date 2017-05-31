@@ -36,7 +36,8 @@ public class HyenaConnectorFactory
         try {
             Bootstrap app = new Bootstrap(
                     binder -> binder.bind(NodeManager.class).toInstance(context.getNodeManager()),
-                    new HyenaModule(connectorId));
+                    new HyenaModule(connectorId),
+                    new HyenaClientModule(connectorId));
 
             Injector injector = app
                     .strictConfig()
