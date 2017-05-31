@@ -14,7 +14,6 @@ import java.util.stream.Collectors;
 import static co.llective.presto.hyena.HyenaTables.PseudoTable.getSchemaTableName;
 import static com.facebook.presto.testing.TestingConnectorSession.SESSION;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 public class TestHyenaRecordSet {
@@ -24,19 +23,21 @@ public class TestHyenaRecordSet {
     public void testSimpleCursor()
             throws Exception
     {
-        HyenaTables localFileTables = new HyenaTables(new HyenaConfig());
-        HyenaMetadata metadata = new HyenaMetadata(localFileTables);
+        HyenaTables hyenaTables = new HyenaTables(new HyenaConfig());
+        HyenaSession hyenaSession = new NativeHyenaSession();
+        HyenaMetadata metadata = new HyenaMetadata(hyenaTables);
 
-        assertData(localFileTables, metadata);
+        assertData(hyenaSession, metadata);
     }
-    private static void assertData(HyenaTables localFileTables, HyenaMetadata metadata)
+
+    private static void assertData(HyenaSession hyenaSession, HyenaMetadata metadata)
     {
         SchemaTableName tableName = getSchemaTableName();
         List<HyenaColumnHandle> columnHandles = metadata.getColumnHandles(SESSION, new HyenaTableHandle(tableName))
                 .values().stream().map(column -> (HyenaColumnHandle) column)
                 .collect(Collectors.toList());
 
-        HyenaRecordSet recordSet = new HyenaRecordSet(localFileTables, new HyenaSplit(address, tableName, TupleDomain.all()), columnHandles);
+        HyenaRecordSet recordSet = new HyenaRecordSet(hyenaSession, new HyenaSplit(address, 1382217178546697565L, TupleDomain.all()), columnHandles);
         RecordCursor cursor = recordSet.cursor();
 
         for (int i = 0; i < columnHandles.size(); i++) {
@@ -47,6 +48,5 @@ public class TestHyenaRecordSet {
             assertTrue(cursor.advanceNextPosition());
             System.out.println(String.format("ts: %d source: %d c1: %d", cursor.getLong(0), cursor.getLong(1), cursor.getLong(2)));
         }
-        assertFalse(cursor.advanceNextPosition());
     }
 }
