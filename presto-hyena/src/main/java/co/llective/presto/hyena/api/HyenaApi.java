@@ -1,7 +1,9 @@
 package co.llective.presto.hyena.api;
 
+import co.llective.presto.hyena.NativeHyenaSession;
 import com.google.common.io.LittleEndianDataInputStream;
 import com.google.common.io.LittleEndianDataOutputStream;
+import io.airlift.log.Logger;
 import nanomsg.Nanomsg;
 import nanomsg.reqrep.ReqSocket;
 import org.apache.commons.lang3.StringUtils;
@@ -12,11 +14,15 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInput;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
 public class HyenaApi {
+    private static final Logger log = Logger.get(HyenaApi.class);
+
     private final Charset UTF8_CHARSET = Charset.forName("UTF-8");
 
     private final ReqSocket s = new ReqSocket();
@@ -66,23 +72,35 @@ public class HyenaApi {
     public static class DenseBlock<T> {
         public List<T> data = new ArrayList<>();
 
+        public DenseBlock() {}
+        public DenseBlock(int size) {
+            this.data = new ArrayList<>(size);
+        }
+
         public T get(int offset) {
             return data.get(offset);
         }
     }
 
     public static class SparseBlock<T> {
-        public List<Pair<Integer, T>> data = new ArrayList<>();
+        public List<Integer> offsetData = new ArrayList<>();
+        public List<T> valueData = new ArrayList<>();
 
         private int currentPosition = 0;
 
+        public SparseBlock() {}
+        public SparseBlock(int size) {
+            offsetData = new ArrayList<>(size);
+            valueData = new ArrayList<>(size);
+        }
+
         public T getMaybe(int offset) {
-            while (currentPosition < data.size() && data.get(currentPosition).getLeft() < offset) {
+            while (currentPosition < offsetData.size() && offsetData.get(currentPosition) < offset) {
                 currentPosition++;
             }
 
-            if (currentPosition < data.size() && data.get(currentPosition).getLeft() == offset) {
-                return data.get(currentPosition).getRight();
+            if (currentPosition < offsetData.size() && offsetData.get(currentPosition) == offset) {
+                return valueData.get(currentPosition);
             }
 
             return null;
@@ -100,10 +118,10 @@ public class HyenaApi {
             int count = 0;
             switch(type) {
                 case Int32Sparse:
-                    count = int32SparseBlock.data.size();
+                    count = int32SparseBlock.offsetData.size();
                     break;
                 case Int64Sparse:
-                    count = int64SparseBlock.data.size();
+                    count = int64SparseBlock.offsetData.size();
                     break;
                 case Int64Dense:
                     count = int64DenseBlock.data.size();
@@ -113,33 +131,35 @@ public class HyenaApi {
             return String.format("%s with %d elements", type.name(), count);
         }
 
-        public static BlockHolder decode(DataInput in) throws IOException {
+        public static BlockHolder decode(ByteBuffer buf) throws IOException {
             BlockHolder holder = new BlockHolder();
-            holder.type = BlockType.values()[in.readInt()];
+            holder.type = BlockType.values()[buf.getInt()];
+            int recordsCount = (int) buf.getLong();
 
             switch(holder.type) {
                 case Int32Sparse:
-                    holder.int32SparseBlock = new SparseBlock<>();
+                    holder.int32SparseBlock = new SparseBlock<>(recordsCount);
                     break;
                 case Int64Sparse:
-                    holder.int64SparseBlock = new SparseBlock<>();
+                    holder.int64SparseBlock = new SparseBlock<>(recordsCount);
                     break;
                 case Int64Dense:
-                    holder.int64DenseBlock = new DenseBlock<>();
+                    holder.int64DenseBlock = new DenseBlock<>(recordsCount);
                     break;
             }
 
-            long records = in.readLong();
-            for (int i = 0; i < records; i++) {
+            for (int i = 0; i < recordsCount; i++) {
                 switch(holder.type) {
                     case Int32Sparse:
-                        holder.int32SparseBlock.data.add(Pair.of(in.readInt(), in.readInt()));
+                        holder.int32SparseBlock.offsetData.add(buf.getInt());
+                        holder.int32SparseBlock.valueData.add(buf.getInt());
                         break;
                     case Int64Sparse:
-                        holder.int64SparseBlock.data.add(Pair.of(in.readInt(), in.readLong()));
+                        holder.int64SparseBlock.offsetData.add(buf.getInt());
+                        holder.int64SparseBlock.valueData.add(buf.getLong());
                         break;
                     case Int64Dense:
-                        holder.int64DenseBlock.data.add(in.readLong());
+                        holder.int64DenseBlock.data.add(buf.getLong());
                         break;
                 }
             }
@@ -171,35 +191,35 @@ public class HyenaApi {
             this.blocks = blocks;
         }
 
-        private static List<Pair<Integer, BlockType>> decodeColumnTypes(DataInput in) throws IOException {
-            long colCount = in.readLong();
+        private static List<Pair<Integer, BlockType>> decodeColumnTypes(ByteBuffer buf) throws IOException {
+            long colCount = buf.getLong();
             List<Pair<Integer, BlockType>> colTypes = new ArrayList<>();
 
             for (int i = 0; i < colCount; i++) {
-                colTypes.add(Pair.of(in.readInt(), BlockType.values()[in.readInt()]));
+                colTypes.add(Pair.of(buf.getInt(), BlockType.values()[buf.getInt()]));
             }
 
             return colTypes;
         }
 
-        private static List<BlockHolder> decodeBlocks(DataInput in) throws IOException {
-            long count = in.readLong();
+        private static List<BlockHolder> decodeBlocks(ByteBuffer buf) throws IOException {
+            long count = buf.getLong();
             List<BlockHolder> blocks = new ArrayList<>();
             for (int i = 0; i < count; i++) {
-                blocks.add(BlockHolder.decode(in));
+                blocks.add(BlockHolder.decode(buf));
             }
             return blocks;
         }
 
-        public static ScanResult decode(DataInput in) throws IOException {
-            int row_count = in.readInt();
-            int col_count = in.readInt();
+        public static ScanResult decode(ByteBuffer buf) throws IOException {
+            int row_count = buf.getInt();
+            int col_count = buf.getInt();
 
             return new ScanResult(
                     row_count,
                     col_count,
-                    ScanResult.decodeColumnTypes(in),
-                    ScanResult.decodeBlocks(in)
+                    ScanResult.decodeColumnTypes(buf),
+                    ScanResult.decodeBlocks(buf)
             );
         }
 
@@ -268,7 +288,7 @@ public class HyenaApi {
 
     private boolean connected = false;
 
-    private void ensureConnected() {
+    private synchronized void ensureConnected() {
         try {
              if (!connected) {
                  connect();
@@ -279,22 +299,43 @@ public class HyenaApi {
     }
 
     public void connect() throws IOException {
+        String handle =  "ipc:///tmp/hyena.ipc";
+        log.info("Opening new connection to: "+handle);
         s.setRecvTimeout(60000);
         s.setSendTimeout(60000);
-        s.connect("ipc:///tmp/hyena.ipc");
+        s.connect(handle);
+        log.info("Connection successfully opened");
         this.connected = true;
     }
 
-    public ScanResult scan(ScanRequest req) throws IOException {
+    public void close() {
+        s.close();
+    }
+
+    public static class HyenaOpMetadata {
+        public int bytes;
+    }
+
+    public ScanResult scan(ScanRequest req, HyenaOpMetadata metaOrNull) throws IOException {
         ensureConnected();
 
         s.send(buildScanMessage(req));
+        log.info("Sent scan request to partition " + req.partitionId);
         try {
-            byte[] response = s.recvBytes();
-            LittleEndianDataInputStream in = new LittleEndianDataInputStream(new ByteArrayInputStream(response));
-            return ScanResult.decode(in);
+            log.info("Waiting for scan response from partition " + req.partitionId);
+            ByteBuffer buf = s.recv();
+            log.info("Received scan response from partition " + req.partitionId);
+            buf.order(ByteOrder.LITTLE_ENDIAN);
+
+            ScanResult result = ScanResult.decode(buf);
+
+            if (metaOrNull != null) {
+                metaOrNull.bytes = buf.position();
+            }
+
+            return result;
         } catch (Throwable t) {
-            System.out.println("Nanomsg error: "+Nanomsg.getError());
+            log.error("Nanomsg error: "+Nanomsg.getError());
             throw new IOException("Nanomsg error: "+Nanomsg.getError(), t);
         }
 
@@ -304,10 +345,10 @@ public class HyenaApi {
         ensureConnected();
 
         s.send(buildRefreshCatalogMessage());
-        // FIXME: we should be using bytebuffer
-        byte[] response = s.recvBytes();
-        LittleEndianDataInputStream in = new LittleEndianDataInputStream(new ByteArrayInputStream(response));
-        return decodeRefreshCatalog(in);
+
+        ByteBuffer buf = s.recv();
+        buf.order(ByteOrder.LITTLE_ENDIAN);
+        return decodeRefreshCatalog(buf);
     }
 
     byte[] buildRefreshCatalogMessage() throws IOException {
@@ -369,38 +410,39 @@ public class HyenaApi {
         return baos.toByteArray();
     }
 
-    Catalog decodeRefreshCatalog(DataInput in) throws IOException {
-        long columnCount = in.readLong();
+    Catalog decodeRefreshCatalog(ByteBuffer buf) throws IOException {
+        long columnCount = buf.getLong();
         List<Column> columns = new ArrayList<>();
         for (int i = 0; i < columnCount; i++) {
-            columns.add(decodeColumn(in));
+            columns.add(decodeColumn(buf));
         }
 
-        long partitionCount = in.readLong();
+        long partitionCount = buf.getLong();
         List<PartitionInfo> partitions = new ArrayList<>();
         for (int i = 0; i < partitionCount; i++) {
-            partitions.add(decodePartitionInfo(in));
+            partitions.add(decodePartitionInfo(buf));
         }
 
         return new Catalog(columns, partitions);
     }
 
-    PartitionInfo decodePartitionInfo(DataInput in) throws IOException {
-        return new PartitionInfo(in.readLong(), in.readLong(), in.readLong(), decodeStringArray(in));
+    PartitionInfo decodePartitionInfo(ByteBuffer buf) throws IOException {
+        return new PartitionInfo(buf.getLong(), buf.getLong(), buf.getLong(), decodeStringArray(buf));
     }
 
-    Column decodeColumn(DataInput in) throws IOException {
+    Column decodeColumn(ByteBuffer buf) throws IOException {
         return new Column(
-                BlockType.values()[in.readInt()],
-                decodeStringArray(in)
+                BlockType.values()[buf.getInt()],
+                decodeStringArray(buf)
         );
     }
 
-    String decodeStringArray(DataInput is) throws IOException {
-        int len = (int) is.readLong();
-        byte[] buf = new byte[len];
-        is.readFully(buf, 0, len);
-        return new String(buf, UTF8_CHARSET);
+    String decodeStringArray(ByteBuffer buf) throws IOException {
+        int len = (int) buf.getLong();
+
+        byte[] bytes = new byte[len];
+        buf.get(bytes, 0, len);
+        return new String(bytes, UTF8_CHARSET);
     }
 
     byte[] encodeByteArray(byte[] values) throws IOException {

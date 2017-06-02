@@ -16,6 +16,7 @@ import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import org.apache.commons.lang3.StringUtils;
@@ -43,10 +44,13 @@ import static java.util.zip.GZIPInputStream.GZIP_MAGIC;
 public class HyenaRecordCursor
         implements RecordCursor
 {
+    private static final Logger log = Logger.get(HyenaApi.class);
+
     private final List<HyenaColumnHandle> columns;
     private final Long partitionId;
     private final TupleDomain<HyenaColumnHandle> predicate;
     private final HyenaSession hyenaSession;
+    private HyenaApi.HyenaOpMetadata hyenaOpMetadata;
 
 
     private List<String> fields;
@@ -57,7 +61,7 @@ public class HyenaRecordCursor
 
     public HyenaRecordCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, HostAddress address, Long partitionId, TupleDomain<HyenaColumnHandle> predicate)
     {
-        this.hyenaSession = requireNonNull(hyenaSession, "hyenaSession is null");
+        HyenaSession baseSession = requireNonNull(hyenaSession, "hyenaSession is null");
         this.columns = requireNonNull(columns, "columns is null");
         this.partitionId = requireNonNull(partitionId, "partitionId is null");
         this.predicate = requireNonNull(predicate, "predicate is null");
@@ -116,14 +120,16 @@ public class HyenaRecordCursor
                         },
                         allOrNone -> ImmutableSet.of());
 
-                System.out.println(values);
+//                System.out.println(values);
 
             }
         }
 
-        System.out.println(StringUtils.join(req.filters, ", "));
+        log.info("Filters: "+StringUtils.join(req.filters, ", "));
 
-        this.result = this.hyenaSession.scan(req);
+        this.hyenaSession = baseSession.recordSetProviderSession();
+        hyenaOpMetadata = new HyenaApi.HyenaOpMetadata();
+        result = this.hyenaSession.scan(req, hyenaOpMetadata);
     }
 
     private void preparePredicates(TupleDomain<HyenaColumnHandle> predicate) {
@@ -141,13 +147,13 @@ public class HyenaRecordCursor
     @Override
     public long getTotalBytes()
     {
-        return 0;
+        return this.hyenaOpMetadata.bytes;
     }
 
     @Override
     public long getCompletedBytes()
     {
-        return 0;
+        return this.hyenaOpMetadata.bytes;
     }
 
     @Override
@@ -197,13 +203,13 @@ public class HyenaRecordCursor
     public double getDouble(int field)
     {
         checkFieldType(field, DOUBLE);
-        return 0.3;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public Slice getSlice(int field)
     {
-        return Slices.utf8Slice("foobar");
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -241,7 +247,7 @@ public class HyenaRecordCursor
     @Override
     public void close()
     {
-        // yes
+        this.hyenaSession.close();
     }
 
 }
