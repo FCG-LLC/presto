@@ -16,13 +16,11 @@ import static java.util.Objects.requireNonNull;
 public class HyenaRecordSetProvider
         implements ConnectorRecordSetProvider
 {
-    private final HyenaTables localFileTables;
     private final HyenaSession hyenaSession;
 
     @Inject
-    public HyenaRecordSetProvider(HyenaTables hyenaTables, HyenaSession session)
+    public HyenaRecordSetProvider(HyenaSession session)
     {
-        this.localFileTables = requireNonNull(hyenaTables, "localFileTables is null");
         this.hyenaSession = requireNonNull(session, "hyenaSession is null");
     }
 
