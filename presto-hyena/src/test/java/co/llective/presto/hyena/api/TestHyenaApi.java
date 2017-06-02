@@ -5,6 +5,8 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import java.io.ByteArrayInputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 
 import static org.testng.Assert.assertEquals;
@@ -64,10 +66,11 @@ public class TestHyenaApi {
                 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 116, 115, 2, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 115, 111, 117, 114, 99, 101, 1, 0, 0, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0, 0, 0, (byte) 200, 0, 0, 0, 0, 0, 0, 0, (byte) 231, 3, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 47, 102, 111, 111, 47, 98, 97, 114
         };
 
-        ByteArrayInputStream bis = new ByteArrayInputStream(encoded);
-        LittleEndianDataInputStream in = new LittleEndianDataInputStream(bis);
+        ByteBuffer buf = ByteBuffer.wrap(encoded);
+        buf.order(ByteOrder.LITTLE_ENDIAN);
+
         // Just smoke test?
-        HyenaApi.Catalog cat = api.decodeRefreshCatalog(in);
+        HyenaApi.Catalog cat = api.decodeRefreshCatalog(buf);
         assertEquals(2, cat.columns.size());
         assertEquals(1, cat.availablePartitions.size());
     }
@@ -93,7 +96,7 @@ public class TestHyenaApi {
         HyenaApi.Catalog cat = api.refreshCatalog();
         System.out.println(cat.toString());
 
-        HyenaApi.ScanResult res = api.scan(req);
+        HyenaApi.ScanResult res = api.scan(req, null);
         System.out.println(res);
 
     }
