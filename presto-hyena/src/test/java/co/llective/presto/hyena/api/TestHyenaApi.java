@@ -23,6 +23,7 @@ public class TestHyenaApi {
         filter.op = HyenaApi.ScanComparison.GtEq;
         filter.column = 2;
         filter.value = 1000;
+        filter.strValue = "";
 
         req.min_ts = 100;
         req.max_ts = 200;
@@ -82,14 +83,15 @@ public class TestHyenaApi {
         HyenaApi.ScanRequest req = new HyenaApi.ScanRequest();
         req.min_ts = 999;
         req.max_ts = 90000000;
-        req.partitionId = 2130850769913105159L;
+        req.partitionId = 1775976771987511425L;
 
         HyenaApi.ScanFilter filter1 = new HyenaApi.ScanFilter();
         filter1.column = 2;
         filter1.op = HyenaApi.ScanComparison.LtEq;
         filter1.value = 50000000000000000L;
+        filter1.strValue = "";
         req.filters = Arrays.asList(filter1);
-        req.projection = Arrays.asList(0,1,2,4);
+        req.projection = Arrays.asList(0,1,2,4,23);
 
         api.connect();
 
