@@ -18,12 +18,13 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class HyenaApi {
     private static final Logger log = Logger.get(HyenaApi.class);
 
-    private final Charset UTF8_CHARSET = Charset.forName("UTF-8");
+    private static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
 
     private final ReqSocket s = new ReqSocket();
 
@@ -46,18 +47,20 @@ public class HyenaApi {
         public int column;
         public ScanComparison op;
         public long value;
+        public String strValue;
 
         public ScanFilter() {}
 
-        public ScanFilter(int column, ScanComparison op, long value) {
+        public ScanFilter(int column, ScanComparison op, long value, String strValue) {
             this.column = column;
             this.op = op;
             this.value = value;
+            this.strValue = strValue;
         }
 
         @Override
         public String toString() {
-            return String.format("%d %s %d", column, op.name(), value);
+            return String.format("%d %s %d/%s", column, op.name(), value, strValue);
         }
     }
 
@@ -79,6 +82,42 @@ public class HyenaApi {
 
         public T get(int offset) {
             return data.get(offset);
+        }
+    }
+
+    public static class StringBlock {
+        public List<Integer> offsetData = new ArrayList<>();
+        public List<Long> valueStartPositions = new ArrayList<>();
+        public byte[] bytes;
+
+        private int currentPosition = 0;
+
+        public StringBlock() {}
+        public StringBlock(int size) {
+            offsetData = new ArrayList<>(size);
+            valueStartPositions = new ArrayList<>(size);
+        }
+
+        public String getMaybe(int offset) {
+            while (currentPosition < offsetData.size() && offsetData.get(currentPosition) < offset) {
+                currentPosition++;
+            }
+
+            if (currentPosition < offsetData.size() && offsetData.get(currentPosition) == offset) {
+                int startPosition = valueStartPositions.get(currentPosition).intValue();
+                int endPosition;
+
+                if (currentPosition == offsetData.size()-1) {
+                    endPosition = bytes.length;
+                } else {
+                    endPosition = valueStartPositions.get(currentPosition+1).intValue();
+                }
+
+                byte[] strBytes = Arrays.copyOfRange(bytes, startPosition, endPosition);
+                return new String(strBytes, UTF8_CHARSET);
+            }
+
+            return null;
         }
     }
 
@@ -112,11 +151,20 @@ public class HyenaApi {
         public DenseBlock<Long> int64DenseBlock;
         public SparseBlock<Long> int64SparseBlock;
         public SparseBlock<Integer> int32SparseBlock;
+        public SparseBlock<Short> int16SparseBlock;
+        public SparseBlock<Byte> int8SparseBlock;
+        public StringBlock stringBlock;
 
         @Override
         public String toString() {
             int count = 0;
             switch(type) {
+                case Int8Sparse:
+                    count = int8SparseBlock.offsetData.size();
+                    break;
+                case Int16Sparse:
+                    count = int16SparseBlock.offsetData.size();
+                    break;
                 case Int32Sparse:
                     count = int32SparseBlock.offsetData.size();
                     break;
@@ -125,6 +173,9 @@ public class HyenaApi {
                     break;
                 case Int64Dense:
                     count = int64DenseBlock.data.size();
+                    break;
+                case String:
+                    count = stringBlock.offsetData.size();
                     break;
             }
 
@@ -137,6 +188,12 @@ public class HyenaApi {
             int recordsCount = (int) buf.getLong();
 
             switch(holder.type) {
+                case Int8Sparse:
+                    holder.int8SparseBlock = new SparseBlock<>(recordsCount);
+                    break;
+                case Int16Sparse:
+                    holder.int16SparseBlock = new SparseBlock<>(recordsCount);
+                    break;
                 case Int32Sparse:
                     holder.int32SparseBlock = new SparseBlock<>(recordsCount);
                     break;
@@ -146,10 +203,21 @@ public class HyenaApi {
                 case Int64Dense:
                     holder.int64DenseBlock = new DenseBlock<>(recordsCount);
                     break;
+                case String:
+                    holder.stringBlock = new StringBlock(recordsCount);
+                    break;
             }
 
             for (int i = 0; i < recordsCount; i++) {
                 switch(holder.type) {
+                    case Int8Sparse:
+                        holder.int8SparseBlock.offsetData.add(buf.getInt());
+                        holder.int8SparseBlock.valueData.add(buf.get());
+                        break;
+                    case Int16Sparse:
+                        holder.int16SparseBlock.offsetData.add(buf.getInt());
+                        holder.int16SparseBlock.valueData.add(buf.getShort());
+                        break;
                     case Int32Sparse:
                         holder.int32SparseBlock.offsetData.add(buf.getInt());
                         holder.int32SparseBlock.valueData.add(buf.getInt());
@@ -161,7 +229,16 @@ public class HyenaApi {
                     case Int64Dense:
                         holder.int64DenseBlock.data.add(buf.getLong());
                         break;
+                    case String:
+                        holder.stringBlock.offsetData.add(buf.getInt());
+                        holder.stringBlock.valueStartPositions.add(buf.getLong());
                 }
+            }
+
+            if (holder.type == BlockType.String) {
+                int len = (int) buf.getLong();
+                holder.stringBlock.bytes = new byte[len];
+                buf.get(holder.stringBlock.bytes, 0, len);
             }
 
             return holder;
@@ -229,7 +306,10 @@ public class HyenaApi {
     public enum BlockType {
         Int64Dense,
         Int64Sparse,
-        Int32Sparse
+        Int32Sparse,
+        Int16Sparse,
+        Int8Sparse,
+        String
     }
 
     public static class Column {
@@ -406,6 +486,7 @@ public class HyenaApi {
         dos.writeInt(filter.column);
         dos.writeInt(filter.op.ordinal());
         dos.writeLong(filter.value);
+        dos.write(encodeStringArray(filter.strValue));
 
         return baos.toByteArray();
     }
@@ -436,6 +517,18 @@ public class HyenaApi {
                 decodeStringArray(buf)
         );
     }
+
+    byte[] encodeStringArray(String str) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(baos);
+
+        byte[] strBytes = str.getBytes(UTF8_CHARSET);
+        dos.writeLong(strBytes.length);
+        dos.write(strBytes);
+
+        return baos.toByteArray();
+    }
+
 
     String decodeStringArray(ByteBuffer buf) throws IOException {
         int len = (int) buf.getLong();

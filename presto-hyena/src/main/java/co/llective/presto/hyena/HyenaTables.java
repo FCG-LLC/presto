@@ -15,6 +15,7 @@ import static co.llective.presto.hyena.HyenaMetadata.PRESTO_HYENA_SCHEMA;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
+import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.base.Preconditions.checkArgument;
 
 public class HyenaTables
@@ -48,11 +49,15 @@ public class HyenaTables
 
     private Type convertBlockType(HyenaApi.BlockType blockType) {
         switch (blockType) {
+            case Int8Sparse:
+            case Int16Sparse:
             case Int32Sparse:
                 return INTEGER;
             case Int64Dense:
             case Int64Sparse:
                 return BIGINT;
+            case String:
+                return VARCHAR;
             default:
                 throw new RuntimeException("I don't know how to handle "+blockType.toString());
         }
