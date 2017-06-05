@@ -31,21 +31,22 @@ public class TestHyenaRecordSet {
 
     private static void assertData(HyenaSession hyenaSession, HyenaMetadata metadata)
     {
-//        SchemaTableName tableName = metadata.listTables(hyenaSession, null).get(0);
-//        List<HyenaColumnHandle> columnHandles = metadata.getColumnHandles(SESSION, new HyenaTableHandle(tableName))
-//                .values().stream().map(column -> (HyenaColumnHandle) column)
-//                .collect(Collectors.toList());
-//
-//        HyenaRecordSet recordSet = new HyenaRecordSet(hyenaSession, new HyenaSplit(address, 1382217178546697565L, TupleDomain.all()), columnHandles);
-//        RecordCursor cursor = recordSet.cursor();
-//
-//        for (int i = 0; i < columnHandles.size(); i++) {
-//            assertEquals(cursor.getType(i), columnHandles.get(i).getColumnType());
-//        }
-//
-//        for (int i = 0; i < 100; i++) {
-//            assertTrue(cursor.advanceNextPosition());
-//            System.out.println(String.format("ts: %d source: %d c1: %d", cursor.getLong(0), cursor.getLong(1), cursor.getLong(2)));
-//        }
+
+        SchemaTableName tableName = metadata.listTables(null, null).get(0);
+        List<HyenaColumnHandle> columnHandles = metadata.getColumnHandles(SESSION, new HyenaTableHandle(tableName))
+                .values().stream().map(column -> (HyenaColumnHandle) column)
+                .collect(Collectors.toList());
+
+        HyenaRecordSet recordSet = new HyenaRecordSet(hyenaSession, new HyenaSplit(address, 1775976771987511425L, TupleDomain.all()), columnHandles);
+        RecordCursor cursor = recordSet.cursor();
+
+        for (int i = 0; i < columnHandles.size(); i++) {
+            assertEquals(cursor.getType(i), columnHandles.get(i).getColumnType());
+        }
+
+        for (int i = 0; i < 100; i++) {
+            assertTrue(cursor.advanceNextPosition());
+            System.out.println(String.format("ts: %d source: %d c1: %d c24: %s", cursor.getLong(0), cursor.getLong(1), cursor.getLong(2), new String(cursor.getSlice(24).getBytes())));
+        }
     }
 }
