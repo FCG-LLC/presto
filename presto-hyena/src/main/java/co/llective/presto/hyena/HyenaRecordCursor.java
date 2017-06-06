@@ -90,8 +90,8 @@ public class HyenaRecordCursor
                             for (Range range : ranges.getOrderedRanges()) {
                                 if (range.isSingleValue()) {
                                     if (column.getColumnType() == VARCHAR) {
-                                        String val = (String) range.getSingleValue();
-                                        req.filters.add(new HyenaApi.ScanFilter(column.getOrdinalPosition(), HyenaApi.ScanComparison.Eq, 0, val));
+                                        Slice val = (Slice) range.getSingleValue();
+                                        req.filters.add(new HyenaApi.ScanFilter(column.getOrdinalPosition(), HyenaApi.ScanComparison.Eq, 0, val.toStringUtf8()));
                                     } else {
                                         Long val = (Long) range.getSingleValue();
                                         req.filters.add(new HyenaApi.ScanFilter(column.getOrdinalPosition(), HyenaApi.ScanComparison.Eq, val, ""));
