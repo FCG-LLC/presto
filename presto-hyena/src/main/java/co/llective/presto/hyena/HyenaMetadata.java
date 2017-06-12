@@ -21,6 +21,8 @@ public class HyenaMetadata
     public static final String PRESTO_HYENA_SCHEMA = "hyena";
     private static final List<String> SCHEMA_NAMES = ImmutableList.of(PRESTO_HYENA_SCHEMA);
 
+    public static final String TIMESTAMP_COLUMN_NAME = "ts";
+
     private final HyenaTables hyenaTables;
 
     @Inject

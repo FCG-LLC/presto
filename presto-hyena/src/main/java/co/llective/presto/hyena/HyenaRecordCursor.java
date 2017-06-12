@@ -98,20 +98,47 @@ public class HyenaRecordCursor
                                     }
                                 } else {
                                     if (range.getHigh().getValueBlock().isPresent()) {
-                                        if (range.getHigh().getBound() == Marker.Bound.BELOW && column.getColumnType() != VARCHAR) {
-                                            Long val = (Long) range.getHigh().getValue();
-                                            req.filters.add(new HyenaApi.ScanFilter(column.getOrdinalPosition(), HyenaApi.ScanComparison.Lt, val, ""));
+                                        Marker high = range.getHigh();
+
+                                        HyenaApi.ScanFilterBuilder builder = new HyenaApi.ScanFilterBuilder().withColumn(column.getOrdinalPosition());
+
+                                        if (high.getBound() == Marker.Bound.BELOW) {
+                                            builder.withOp(HyenaApi.ScanComparison.Lt);
+                                        } else if (high.getBound() == Marker.Bound.EXACTLY) {
+                                            builder.withOp(HyenaApi.ScanComparison.LtEq);
                                         } else {
-                                            throw new UnsupportedOperationException("We don't know how to handle this yet");
+                                            throw new UnsupportedOperationException("We don't know how to handle this yet - high values and neither below nor exactly marker present?");
                                         }
+
+                                        if (column.getColumnType() == VARCHAR) {
+                                            builder.withStringValue(((Slice) high.getValue()).toStringUtf8());
+                                        } else {
+                                            builder.withLongValue((Long) high.getValue());
+                                        }
+
+                                        req.filters.add(builder.build());
                                     }
+
                                     if (range.getLow().getValueBlock().isPresent()) {
-                                        if (range.getLow().getBound() == Marker.Bound.ABOVE && column.getColumnType() != VARCHAR) {
-                                            Long val = (Long) range.getLow().getValue();
-                                            req.filters.add(new HyenaApi.ScanFilter(column.getOrdinalPosition(), HyenaApi.ScanComparison.Gt, val, ""));
+                                        HyenaApi.ScanFilterBuilder builder = new HyenaApi.ScanFilterBuilder().withColumn(column.getOrdinalPosition());
+
+                                        Marker low = range.getLow();
+
+                                        if (low.getBound() == Marker.Bound.ABOVE) {
+                                            builder.withOp(HyenaApi.ScanComparison.Gt);
+                                        } else if (low.getBound() == Marker.Bound.EXACTLY) {
+                                            builder.withOp(HyenaApi.ScanComparison.GtEq);
                                         } else {
-                                            throw new UnsupportedOperationException("We don't know how to handle this yet");
+                                            throw new UnsupportedOperationException("We don't know how to handle this yet - low values and neither above nor exactly marker present?");
                                         }
+
+                                        if (column.getColumnType() == VARCHAR) {
+                                            builder.withStringValue(((Slice) low.getValue()).toStringUtf8());
+                                        } else {
+                                            builder.withLongValue((Long) low.getValue());
+                                        }
+
+                                        req.filters.add(builder.build());
                                     }
 
                                 }
@@ -179,7 +206,7 @@ public class HyenaRecordCursor
     @Override
     public boolean advanceNextPosition()
     {
-        return rowPosition++ < result.row_count;
+        return ++rowPosition < result.row_count;
     }
 
     @Override
@@ -237,6 +264,8 @@ public class HyenaRecordCursor
     {
         HyenaApi.BlockHolder holder = getBlockHolder(field);
         switch (holder.type) {
+//            case Int64Dense:
+//                return holder.int64DenseBlock.data.size() >= rowPosition;
             case Int64Sparse:
                 return holder.int64SparseBlock.getMaybe(rowPosition) == null;
             case Int32Sparse:
