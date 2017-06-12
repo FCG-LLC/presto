@@ -64,6 +64,46 @@ public class HyenaApi {
         }
     }
 
+    public static class ScanFilterBuilder {
+        private ScanFilter filter = new ScanFilter();
+        private boolean columnSet = false;
+        private boolean opSet = false;
+        private boolean filterValSet = false;
+
+        public ScanFilterBuilder() {
+            this.filter.strValue = "";
+            this.filter.value = 0;
+        }
+
+        public ScanFilterBuilder withColumn(int column) {
+            columnSet = true;
+            filter.column = column;
+            return this;
+        }
+        public ScanFilterBuilder withOp(ScanComparison op) {
+            opSet = true;
+            filter.op = op;
+            return this;
+        }
+        public ScanFilterBuilder withLongValue(long val) {
+            filterValSet = true;
+            filter.value = val;
+            return this;
+        }
+        public ScanFilterBuilder withStringValue(String val) {
+            filterValSet = true;
+            filter.strValue = val;
+            return this;
+        }
+        public ScanFilter build() {
+            assert(filterValSet);
+            assert(columnSet);
+            assert(opSet);
+
+            return filter;
+        }
+    }
+
     public static class ScanRequest {
         public long min_ts;
         public long max_ts;
@@ -292,6 +332,8 @@ public class HyenaApi {
             int row_count = buf.getInt();
             int col_count = buf.getInt();
 
+            log.info("Received ResultSet with %d rows", row_count);
+
             return new ScanResult(
                     row_count,
                     col_count,
@@ -435,7 +477,7 @@ public class HyenaApi {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(baos);
         dos.writeInt(ApiRequest.RefreshCatalog.ordinal());
-        dos.writeLong(0);
+        dos.writeLong(0L); // 0 bytes for payload
         baos.close();
 
         return baos.toByteArray();
@@ -444,7 +486,7 @@ public class HyenaApi {
     byte[] buildScanMessage(ScanRequest req) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(baos);
-        dos.writeInt(1);
+        dos.writeInt(ApiRequest.Scan.ordinal());
 
         byte[] scanRequest = encodeScanRequest(req);
         baos.write(encodeByteArray(scanRequest));
