@@ -1,47 +1,47 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package co.llective.presto.hyena;
 
 import co.llective.presto.hyena.api.HyenaApi;
 import com.facebook.presto.spi.HostAddress;
-import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.RecordCursor;
-import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.predicate.Marker;
 import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.Type;
 import com.google.common.base.Joiner;
-import com.google.common.base.Splitter;
-import com.google.common.base.Strings;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
-import io.airlift.slice.Slices;
 import org.apache.commons.lang3.StringUtils;
-import org.joda.time.format.DateTimeFormatter;
-import org.joda.time.format.DateTimeFormatterBuilder;
-import org.joda.time.format.ISODateTimeFormat;
 
-import java.io.*;
-import java.util.*;
-import java.util.zip.GZIPInputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
-import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
-import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharType;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.slice.Slices.utf8Slice;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.toSet;
-import static java.util.zip.GZIPInputStream.GZIP_MAGIC;
 
 public class HyenaRecordCursor
         implements RecordCursor
@@ -53,7 +53,6 @@ public class HyenaRecordCursor
     private final TupleDomain<HyenaColumnHandle> predicate;
     private final HyenaSession hyenaSession;
     private HyenaApi.HyenaOpMetadata hyenaOpMetadata;
-
 
     private List<String> fields;
     private int foobar = 0;
@@ -69,11 +68,12 @@ public class HyenaRecordCursor
         this.predicate = requireNonNull(predicate, "predicate is null");
 
         HyenaApi.ScanRequest req = new HyenaApi.ScanRequest();
-        req.min_ts = 0;
-        req.max_ts = Long.MAX_VALUE;
+        req.minTs = 0;
+        req.maxTs = Long.MAX_VALUE;
         req.partitionId = partitionId;
         req.projection = new ArrayList<>();
         req.filters = new ArrayList<>();
+
         for (HyenaColumnHandle col : columns) {
             req.projection.add(col.getOrdinalPosition());
         }
@@ -92,11 +92,13 @@ public class HyenaRecordCursor
                                     if (column.getColumnType() == VARCHAR) {
                                         Slice val = (Slice) range.getSingleValue();
                                         req.filters.add(new HyenaApi.ScanFilter(column.getOrdinalPosition(), HyenaApi.ScanComparison.Eq, 0, val.toStringUtf8()));
-                                    } else {
+                                    }
+                                    else {
                                         Long val = (Long) range.getSingleValue();
                                         req.filters.add(new HyenaApi.ScanFilter(column.getOrdinalPosition(), HyenaApi.ScanComparison.Eq, val, ""));
                                     }
-                                } else {
+                                }
+                                else {
                                     if (range.getHigh().getValueBlock().isPresent()) {
                                         Marker high = range.getHigh();
 
@@ -104,15 +106,18 @@ public class HyenaRecordCursor
 
                                         if (high.getBound() == Marker.Bound.BELOW) {
                                             builder.withOp(HyenaApi.ScanComparison.Lt);
-                                        } else if (high.getBound() == Marker.Bound.EXACTLY) {
+                                        }
+                                        else if (high.getBound() == Marker.Bound.EXACTLY) {
                                             builder.withOp(HyenaApi.ScanComparison.LtEq);
-                                        } else {
+                                        }
+                                        else {
                                             throw new UnsupportedOperationException("We don't know how to handle this yet - high values and neither below nor exactly marker present?");
                                         }
 
                                         if (column.getColumnType() == VARCHAR) {
                                             builder.withStringValue(((Slice) high.getValue()).toStringUtf8());
-                                        } else {
+                                        }
+                                        else {
                                             builder.withLongValue((Long) high.getValue());
                                         }
 
@@ -126,23 +131,24 @@ public class HyenaRecordCursor
 
                                         if (low.getBound() == Marker.Bound.ABOVE) {
                                             builder.withOp(HyenaApi.ScanComparison.Gt);
-                                        } else if (low.getBound() == Marker.Bound.EXACTLY) {
+                                        }
+                                        else if (low.getBound() == Marker.Bound.EXACTLY) {
                                             builder.withOp(HyenaApi.ScanComparison.GtEq);
-                                        } else {
+                                        }
+                                        else {
                                             throw new UnsupportedOperationException("We don't know how to handle this yet - low values and neither above nor exactly marker present?");
                                         }
 
                                         if (column.getColumnType() == VARCHAR) {
                                             builder.withStringValue(((Slice) low.getValue()).toStringUtf8());
-                                        } else {
+                                        }
+                                        else {
                                             builder.withLongValue((Long) low.getValue());
                                         }
 
                                         req.filters.add(builder.build());
                                     }
-
                                 }
-
                             }
                             return columnValues.build();
                         },
@@ -153,20 +159,18 @@ public class HyenaRecordCursor
                             return ImmutableSet.of();
                         },
                         allOrNone -> ImmutableSet.of());
-
-//                System.out.println(values);
-
             }
         }
 
-        log.info("Filters: "+StringUtils.join(req.filters, ", "));
+        log.info("Filters: " + StringUtils.join(req.filters, ", "));
 
         this.hyenaSession = baseSession.recordSetProviderSession();
         hyenaOpMetadata = new HyenaApi.HyenaOpMetadata();
         result = this.hyenaSession.scan(req, hyenaOpMetadata);
     }
 
-    private void preparePredicates(TupleDomain<HyenaColumnHandle> predicate) {
+    private void preparePredicates(TupleDomain<HyenaColumnHandle> predicate)
+    {
         Optional<Map<HyenaColumnHandle, Domain>> domains = predicate.getDomains();
         if (!domains.isPresent()) {
             return;
@@ -174,7 +178,8 @@ public class HyenaRecordCursor
         // SUMTHIN
     }
 
-    private HyenaApi.BlockHolder getBlockHolder(int col) {
+    private HyenaApi.BlockHolder getBlockHolder(int col)
+    {
         return this.result.blocks.get(col);
     }
 
@@ -206,7 +211,7 @@ public class HyenaRecordCursor
     @Override
     public boolean advanceNextPosition()
     {
-        return ++rowPosition < result.row_count;
+        return ++rowPosition < result.rowCount;
     }
 
     @Override
@@ -248,7 +253,9 @@ public class HyenaRecordCursor
     public Slice getSlice(int field)
     {
         HyenaApi.BlockHolder holder = getBlockHolder(field);
-        assert holder.type == HyenaApi.BlockType.String;
+        if (holder.type != HyenaApi.BlockType.String) {
+            throw new RuntimeException("Expected String block type. Found " + holder.type.name() + " instead");
+        }
 
         return utf8Slice(holder.stringBlock.getMaybe(rowPosition));
     }
@@ -298,5 +305,4 @@ public class HyenaRecordCursor
     {
         this.hyenaSession.close();
     }
-
 }
