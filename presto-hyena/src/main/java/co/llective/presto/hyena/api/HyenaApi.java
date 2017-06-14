@@ -1,7 +1,5 @@
 package co.llective.presto.hyena.api;
 
-import co.llective.presto.hyena.NativeHyenaSession;
-import com.google.common.io.LittleEndianDataInputStream;
 import com.google.common.io.LittleEndianDataOutputStream;
 import io.airlift.log.Logger;
 import nanomsg.Nanomsg;
@@ -9,10 +7,7 @@ import nanomsg.reqrep.ReqSocket;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
-import javax.xml.crypto.Data;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.DataInput;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -411,21 +406,16 @@ public class HyenaApi {
     private boolean connected = false;
 
     private synchronized void ensureConnected() {
-        try {
-             if (!connected) {
-                 connect();
-             }
-        } catch (IOException ioe) {
-            throw new RuntimeException(ioe);
+        if (!connected) {
+            throw new RuntimeException("Hyena must be connected first!");
         }
     }
 
-    public void connect() throws IOException {
-        String handle =  "ipc:///tmp/hyena.ipc";
-        log.info("Opening new connection to: "+handle);
+    public void connect(String url) throws IOException {
+        log.info("Opening new connection to: "+url);
         s.setRecvTimeout(60000);
         s.setSendTimeout(60000);
-        s.connect(handle);
+        s.connect(url);
         log.info("Connection successfully opened");
         this.connected = true;
     }

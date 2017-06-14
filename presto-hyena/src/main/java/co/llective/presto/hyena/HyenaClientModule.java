@@ -19,7 +19,6 @@ import static java.util.Objects.requireNonNull;
 public class HyenaClientModule
         implements Module {
     private final String connectorId;
-//    private final HyenaConfig config;
 
     public HyenaClientModule(String connectorId) {
         this.connectorId = connectorId;
@@ -40,6 +39,6 @@ public class HyenaClientModule
     @Provides
     public static HyenaSession createHyenaSession(
             HyenaConfig config) {
-        return new NativeHyenaSession();
+        return new NativeHyenaSession(config);
     }
 }

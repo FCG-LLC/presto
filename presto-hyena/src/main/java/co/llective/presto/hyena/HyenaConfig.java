@@ -11,7 +11,7 @@ public class HyenaConfig {
         return hyenaHost;
     }
 
-    @Config("presto-hyena.host")
+    @Config("hyena.url")
     @ConfigDescription("Hyena host address")
     public HyenaConfig setHyenaHost(String hyenaHost)
     {

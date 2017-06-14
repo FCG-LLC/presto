@@ -8,9 +8,16 @@ import java.util.List;
 
 public class NativeHyenaSession implements HyenaSession {
     private final HyenaApi hyenaApi;
+    private final HyenaConfig hyenaConfig;
 
-    public NativeHyenaSession() {
+    public NativeHyenaSession(HyenaConfig config) {
+        hyenaConfig = config;
         hyenaApi = new HyenaApi();
+        try {
+            hyenaApi.connect(config.getHyenaHost());
+        } catch (IOException ioe) {
+            throw new RuntimeException(ioe);
+        }
     }
 
     public void close() {
@@ -19,7 +26,7 @@ public class NativeHyenaSession implements HyenaSession {
 
     @Override
     public NativeHyenaSession recordSetProviderSession() {
-        return new NativeHyenaSession();
+        return new NativeHyenaSession(hyenaConfig);
     }
 
     private HyenaApi.Catalog refreshCatalog() {
