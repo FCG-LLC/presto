@@ -22,8 +22,11 @@ public class TestHyenaRecordSet {
     public void testSimpleCursor()
             throws Exception
     {
-        HyenaTables hyenaTables = new HyenaTables(new HyenaConfig());
-        HyenaSession hyenaSession = new NativeHyenaSession();
+        HyenaConfig config = new HyenaConfig();
+        config.setHyenaHost("ipc:///tmp/hyena.ipc");
+
+        HyenaTables hyenaTables = new HyenaTables(config);
+        HyenaSession hyenaSession = new NativeHyenaSession(config);
         HyenaMetadata metadata = new HyenaMetadata(hyenaTables);
 
         assertData(hyenaSession, metadata);
