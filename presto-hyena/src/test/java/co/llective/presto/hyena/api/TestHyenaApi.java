@@ -93,7 +93,7 @@ public class TestHyenaApi {
         req.filters = Arrays.asList(filter1);
         req.projection = Arrays.asList(0,1,2,4,23);
 
-        api.connect();
+        api.connect("ipc:///tmp/hyena.ipc");
 
         HyenaApi.Catalog cat = api.refreshCatalog();
         System.out.println(cat.toString());
