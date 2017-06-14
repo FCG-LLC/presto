@@ -85,6 +85,7 @@
         <module>presto-hive-hadoop2</module>
         <module>presto-hive-cdh4</module>
         <module>presto-hive-cdh5</module>
+        <module>presto-hyena</module>
         <module>presto-teradata-functions</module>
         <module>presto-example-http</module>
         <module>presto-local-file</module>
@@ -114,7 +115,6 @@
         <module>presto-plugin-toolkit</module>
         <module>presto-resource-group-managers</module>
         <module>presto-benchto-benchmarks</module>
-        <module>presto-hyena</module>
     </modules>
 
     <dependencyManagement>
@@ -166,6 +166,12 @@
             <dependency>
                 <groupId>com.facebook.presto</groupId>
                 <artifactId>presto-orc</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.facebook.presto</groupId>
+                <artifactId>presto-hyena</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
