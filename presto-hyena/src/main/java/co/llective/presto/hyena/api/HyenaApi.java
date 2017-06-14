@@ -343,7 +343,7 @@ public class HyenaApi
         @Override
         public String toString()
         {
-            StringBuffer sb = new StringBuffer();
+            StringBuilder sb = new StringBuilder();
 
             sb.append(String.format("Result having %d rows with %d columns. ", rowCount, colCount));
             sb.append(StringUtils.join(blocks, ", "));
@@ -460,7 +460,7 @@ public class HyenaApi
         @Override
         public String toString()
         {
-            StringBuffer sb = new StringBuffer();
+            StringBuilder sb = new StringBuilder();
             sb.append("Columns: ");
             sb.append(StringUtils.join(columns, ", "));
             sb.append("Partitions: ");
