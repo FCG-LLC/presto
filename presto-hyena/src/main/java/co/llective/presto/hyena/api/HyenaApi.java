@@ -1,3 +1,16 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package co.llective.presto.hyena.api;
 
 import com.google.common.io.LittleEndianDataOutputStream;
@@ -16,20 +29,23 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class HyenaApi {
+public class HyenaApi
+{
     private static final Logger log = Logger.get(HyenaApi.class);
 
     private static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
 
     private final ReqSocket s = new ReqSocket();
 
-    public enum ApiRequest {
+    public enum ApiRequest
+    {
         Insert,
         Scan,
         RefreshCatalog
     }
 
-    public enum ScanComparison {
+    public enum ScanComparison
+    {
         Lt,
         LtEq,
         Eq,
@@ -38,7 +54,8 @@ public class HyenaApi {
         NotEq
     }
 
-    public static class ScanFilter {
+    public static class ScanFilter
+    {
         public int column;
         public ScanComparison op;
         public long value;
@@ -46,7 +63,8 @@ public class HyenaApi {
 
         public ScanFilter() {}
 
-        public ScanFilter(int column, ScanComparison op, long value, String strValue) {
+        public ScanFilter(int column, ScanComparison op, long value, String strValue)
+        {
             this.column = column;
             this.op = op;
             this.value = value;
@@ -54,73 +72,98 @@ public class HyenaApi {
         }
 
         @Override
-        public String toString() {
+        public String toString()
+        {
             return String.format("%d %s %d/%s", column, op.name(), value, strValue);
         }
     }
 
-    public static class ScanFilterBuilder {
+    public static class ScanFilterBuilder
+    {
         private ScanFilter filter = new ScanFilter();
         private boolean columnSet = false;
         private boolean opSet = false;
         private boolean filterValSet = false;
 
-        public ScanFilterBuilder() {
+        public ScanFilterBuilder()
+        {
             this.filter.strValue = "";
             this.filter.value = 0;
         }
 
-        public ScanFilterBuilder withColumn(int column) {
+        public ScanFilterBuilder withColumn(int column)
+        {
             columnSet = true;
             filter.column = column;
             return this;
         }
-        public ScanFilterBuilder withOp(ScanComparison op) {
+
+        public ScanFilterBuilder withOp(ScanComparison op)
+        {
             opSet = true;
             filter.op = op;
             return this;
         }
-        public ScanFilterBuilder withLongValue(long val) {
+
+        public ScanFilterBuilder withLongValue(long val)
+        {
             filterValSet = true;
             filter.value = val;
             return this;
         }
-        public ScanFilterBuilder withStringValue(String val) {
+
+        public ScanFilterBuilder withStringValue(String val)
+        {
             filterValSet = true;
             filter.strValue = val;
             return this;
         }
-        public ScanFilter build() {
-            assert(filterValSet);
-            assert(columnSet);
-            assert(opSet);
+
+        public ScanFilter build()
+        {
+            if (!filterValSet) {
+                throw new RuntimeException("Filter value not set");
+            }
+
+            if (!columnSet) {
+                throw new RuntimeException("Column not set");
+            }
+
+            if (!opSet) {
+                throw new RuntimeException("Operation not set");
+            }
 
             return filter;
         }
     }
 
-    public static class ScanRequest {
-        public long min_ts;
-        public long max_ts;
+    public static class ScanRequest
+    {
+        public long minTs;
+        public long maxTs;
         public long partitionId;
         public List<ScanFilter> filters;
         public List<Integer> projection;
     }
 
-    public static class DenseBlock<T> {
+    public static class DenseBlock<T>
+    {
         public List<T> data = new ArrayList<>();
 
         public DenseBlock() {}
-        public DenseBlock(int size) {
+        public DenseBlock(int size)
+        {
             this.data = new ArrayList<>(size);
         }
 
-        public T get(int offset) {
+        public T get(int offset)
+        {
             return data.get(offset);
         }
     }
 
-    public static class StringBlock {
+    public static class StringBlock
+    {
         public List<Integer> offsetData = new ArrayList<>();
         public List<Long> valueStartPositions = new ArrayList<>();
         public byte[] bytes;
@@ -128,12 +171,14 @@ public class HyenaApi {
         private int currentPosition = 0;
 
         public StringBlock() {}
-        public StringBlock(int size) {
+        public StringBlock(int size)
+        {
             offsetData = new ArrayList<>(size);
             valueStartPositions = new ArrayList<>(size);
         }
 
-        public String getMaybe(int offset) {
+        public String getMaybe(int offset)
+        {
             while (currentPosition < offsetData.size() && offsetData.get(currentPosition) < offset) {
                 currentPosition++;
             }
@@ -142,10 +187,11 @@ public class HyenaApi {
                 int startPosition = valueStartPositions.get(currentPosition).intValue();
                 int endPosition;
 
-                if (currentPosition == offsetData.size()-1) {
+                if (currentPosition == offsetData.size() - 1) {
                     endPosition = bytes.length;
-                } else {
-                    endPosition = valueStartPositions.get(currentPosition+1).intValue();
+                }
+                else {
+                    endPosition = valueStartPositions.get(currentPosition + 1).intValue();
                 }
 
                 byte[] strBytes = Arrays.copyOfRange(bytes, startPosition, endPosition);
@@ -156,19 +202,23 @@ public class HyenaApi {
         }
     }
 
-    public static class SparseBlock<T> {
+    public static class SparseBlock<T>
+    {
         public List<Integer> offsetData = new ArrayList<>();
         public List<T> valueData = new ArrayList<>();
 
         private int currentPosition = 0;
 
         public SparseBlock() {}
-        public SparseBlock(int size) {
+
+        public SparseBlock(int size)
+        {
             offsetData = new ArrayList<>(size);
             valueData = new ArrayList<>(size);
         }
 
-        public T getMaybe(int offset) {
+        public T getMaybe(int offset)
+        {
             while (currentPosition < offsetData.size() && offsetData.get(currentPosition) < offset) {
                 currentPosition++;
             }
@@ -181,7 +231,8 @@ public class HyenaApi {
         }
     }
 
-    public static class BlockHolder {
+    public static class BlockHolder
+    {
         public BlockType type;
         public DenseBlock<Long> int64DenseBlock;
         public SparseBlock<Long> int64SparseBlock;
@@ -191,7 +242,8 @@ public class HyenaApi {
         public StringBlock stringBlock;
 
         @Override
-        public String toString() {
+        public String toString()
+        {
             int count = 0;
             switch(type) {
                 case Int8Sparse:
@@ -217,7 +269,8 @@ public class HyenaApi {
             return String.format("%s with %d elements", type.name(), count);
         }
 
-        public static BlockHolder decode(ByteBuffer buf) throws IOException {
+        public static BlockHolder decode(ByteBuffer buf) throws IOException
+        {
             BlockHolder holder = new BlockHolder();
             holder.type = BlockType.values()[buf.getInt()];
             int recordsCount = (int) buf.getLong();
@@ -278,32 +331,35 @@ public class HyenaApi {
 
             return holder;
         }
-
     }
 
-    public static class ScanResult {
-        public int row_count;
-        public int col_count;
-        public List<Pair<Integer, BlockType>> col_types;
+    public static class ScanResult
+    {
+        public int rowCount;
+        public int colCount;
+        public List<Pair<Integer, BlockType>> colTypes;
         public List<BlockHolder> blocks;
 
         @Override
-        public String toString() {
+        public String toString()
+        {
             StringBuffer sb = new StringBuffer();
 
-            sb.append(String.format("Result having %d rows with %d columns. ", row_count, col_count));
+            sb.append(String.format("Result having %d rows with %d columns. ", rowCount, colCount));
             sb.append(StringUtils.join(blocks, ", "));
             return sb.toString();
         }
 
-        public ScanResult(int row_count, int col_count, List<Pair<Integer, BlockType>> col_types, List<BlockHolder> blocks) {
-            this.row_count = row_count;
-            this.col_count = col_count;
-            this.col_types = col_types;
+        public ScanResult(int rowCount, int colCount, List<Pair<Integer, BlockType>> colTypes, List<BlockHolder> blocks)
+        {
+            this.rowCount = rowCount;
+            this.colCount = colCount;
+            this.colTypes = colTypes;
             this.blocks = blocks;
         }
 
-        private static List<Pair<Integer, BlockType>> decodeColumnTypes(ByteBuffer buf) throws IOException {
+        private static List<Pair<Integer, BlockType>> decodeColumnTypes(ByteBuffer buf) throws IOException
+        {
             long colCount = buf.getLong();
             List<Pair<Integer, BlockType>> colTypes = new ArrayList<>();
 
@@ -314,7 +370,8 @@ public class HyenaApi {
             return colTypes;
         }
 
-        private static List<BlockHolder> decodeBlocks(ByteBuffer buf) throws IOException {
+        private static List<BlockHolder> decodeBlocks(ByteBuffer buf) throws IOException
+        {
             long count = buf.getLong();
             List<BlockHolder> blocks = new ArrayList<>();
             for (int i = 0; i < count; i++) {
@@ -323,24 +380,24 @@ public class HyenaApi {
             return blocks;
         }
 
-        public static ScanResult decode(ByteBuffer buf) throws IOException {
-            int row_count = buf.getInt();
-            int col_count = buf.getInt();
+        public static ScanResult decode(ByteBuffer buf) throws IOException
+        {
+            int rowCount = buf.getInt();
+            int colCount = buf.getInt();
 
-            log.info("Received ResultSet with %d rows", row_count);
+            log.info("Received ResultSet with %d rows", rowCount);
 
             return new ScanResult(
-                    row_count,
-                    col_count,
+                    rowCount,
+                    colCount,
                     ScanResult.decodeColumnTypes(buf),
                     ScanResult.decodeBlocks(buf)
             );
         }
-
-
     }
 
-    public enum BlockType {
+    public enum BlockType
+    {
         Int64Dense,
         Int64Sparse,
         Int32Sparse,
@@ -349,51 +406,60 @@ public class HyenaApi {
         String
     }
 
-    public static class Column {
-        public BlockType data_type;
+    public static class Column
+    {
+        public BlockType dataType;
         public String name;
 
-        public Column(BlockType data_type, String name) {
-            this.data_type = data_type;
+        public Column(BlockType dataType, String name)
+        {
+            this.dataType = dataType;
             this.name = name;
         }
 
         @Override
-        public String toString() {
-            return String.format("%s %s", name, data_type.name());
+        public String toString()
+        {
+            return String.format("%s %s", name, dataType.name());
         }
     }
 
-    public static class PartitionInfo {
-        public long min_ts;
-        public long max_ts;
+    public static class PartitionInfo
+    {
+        public long minTs;
+        public long maxTs;
         public long id;
         public String location;
 
-        public PartitionInfo(long min_ts, long max_ts, long id, String location) {
-            this.min_ts = min_ts;
-            this.max_ts = max_ts;
+        public PartitionInfo(long minTs, long maxTs, long id, String location)
+        {
+            this.minTs = minTs;
+            this.maxTs = maxTs;
             this.id = id;
             this.location = location;
         }
 
         @Override
-        public String toString() {
-            return String.format("%d [%d-%d]", this.id, this.min_ts, this.max_ts);
+        public String toString()
+        {
+            return String.format("%d [%d-%d]", this.id, this.minTs, this.maxTs);
         }
     }
 
-    public static class Catalog {
+    public static class Catalog
+    {
         public List<Column> columns;
         public List<PartitionInfo> availablePartitions;
 
-        public Catalog(List<Column> columns, List<PartitionInfo> availablePartitions) {
+        public Catalog(List<Column> columns, List<PartitionInfo> availablePartitions)
+        {
             this.columns = columns;
             this.availablePartitions = availablePartitions;
         }
 
         @Override
-        public String toString() {
+        public String toString()
+        {
             StringBuffer sb = new StringBuffer();
             sb.append("Columns: ");
             sb.append(StringUtils.join(columns, ", "));
@@ -405,14 +471,16 @@ public class HyenaApi {
 
     private boolean connected = false;
 
-    private synchronized void ensureConnected() {
+    private synchronized void ensureConnected()
+    {
         if (!connected) {
             throw new RuntimeException("Hyena must be connected first!");
         }
     }
 
-    public void connect(String url) throws IOException {
-        log.info("Opening new connection to: "+url);
+    public void connect(String url) throws IOException
+    {
+        log.info("Opening new connection to: " + url);
         s.setRecvTimeout(60000);
         s.setSendTimeout(60000);
         s.connect(url);
@@ -420,15 +488,18 @@ public class HyenaApi {
         this.connected = true;
     }
 
-    public void close() {
+    public void close()
+    {
         s.close();
     }
 
-    public static class HyenaOpMetadata {
+    public static class HyenaOpMetadata
+    {
         public int bytes;
     }
 
-    public ScanResult scan(ScanRequest req, HyenaOpMetadata metaOrNull) throws IOException {
+    public ScanResult scan(ScanRequest req, HyenaOpMetadata metaOrNull) throws IOException
+    {
         ensureConnected();
 
         s.send(buildScanMessage(req));
@@ -446,14 +517,15 @@ public class HyenaApi {
             }
 
             return result;
-        } catch (Throwable t) {
-            log.error("Nanomsg error: "+Nanomsg.getError());
-            throw new IOException("Nanomsg error: "+Nanomsg.getError(), t);
         }
-
+        catch (Throwable t) {
+            log.error("Nanomsg error: " + Nanomsg.getError());
+            throw new IOException("Nanomsg error: " + Nanomsg.getError(), t);
+        }
     }
 
-    public Catalog refreshCatalog() throws IOException {
+    public Catalog refreshCatalog() throws IOException
+    {
         ensureConnected();
 
         s.send(buildRefreshCatalogMessage());
@@ -463,7 +535,8 @@ public class HyenaApi {
         return decodeRefreshCatalog(buf);
     }
 
-    byte[] buildRefreshCatalogMessage() throws IOException {
+    byte[] buildRefreshCatalogMessage() throws IOException
+    {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(baos);
         dos.writeInt(ApiRequest.RefreshCatalog.ordinal());
@@ -473,7 +546,8 @@ public class HyenaApi {
         return baos.toByteArray();
     }
 
-    byte[] buildScanMessage(ScanRequest req) throws IOException {
+    byte[] buildScanMessage(ScanRequest req) throws IOException
+    {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(baos);
         dos.writeInt(ApiRequest.Scan.ordinal());
@@ -486,22 +560,24 @@ public class HyenaApi {
         return baos.toByteArray();
     }
 
-    byte[] encodeScanRequest(ScanRequest req) throws IOException {
+    byte[] encodeScanRequest(ScanRequest req) throws IOException
+    {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(baos);
 
-        dos.writeLong(req.min_ts);
-        dos.writeLong(req.max_ts);
+        dos.writeLong(req.minTs);
+        dos.writeLong(req.maxTs);
         dos.writeLong(req.partitionId);
 
         dos.writeLong(req.projection.size());
-        for (Integer projected_column : req.projection) {
-            dos.writeInt(projected_column);
+        for (Integer projectedColumn : req.projection) {
+            dos.writeInt(projectedColumn);
         }
 
         if (req.filters == null) {
             dos.writeLong(0);
-        } else {
+        }
+        else {
             dos.writeLong(req.filters.size());
             for (ScanFilter filter : req.filters) {
                 dos.write(encodeScanFilter(filter));
@@ -511,7 +587,8 @@ public class HyenaApi {
         return baos.toByteArray();
     }
 
-    byte[] encodeScanFilter(ScanFilter filter) throws IOException {
+    byte[] encodeScanFilter(ScanFilter filter) throws IOException
+    {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(baos);
 
@@ -523,7 +600,8 @@ public class HyenaApi {
         return baos.toByteArray();
     }
 
-    Catalog decodeRefreshCatalog(ByteBuffer buf) throws IOException {
+    Catalog decodeRefreshCatalog(ByteBuffer buf) throws IOException
+    {
         long columnCount = buf.getLong();
         List<Column> columns = new ArrayList<>();
         for (int i = 0; i < columnCount; i++) {
@@ -539,18 +617,21 @@ public class HyenaApi {
         return new Catalog(columns, partitions);
     }
 
-    PartitionInfo decodePartitionInfo(ByteBuffer buf) throws IOException {
+    PartitionInfo decodePartitionInfo(ByteBuffer buf) throws IOException
+    {
         return new PartitionInfo(buf.getLong(), buf.getLong(), buf.getLong(), decodeStringArray(buf));
     }
 
-    Column decodeColumn(ByteBuffer buf) throws IOException {
+    Column decodeColumn(ByteBuffer buf) throws IOException
+    {
         return new Column(
                 BlockType.values()[buf.getInt()],
                 decodeStringArray(buf)
         );
     }
 
-    byte[] encodeStringArray(String str) throws IOException {
+    byte[] encodeStringArray(String str) throws IOException
+    {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(baos);
 
@@ -561,8 +642,8 @@ public class HyenaApi {
         return baos.toByteArray();
     }
 
-
-    String decodeStringArray(ByteBuffer buf) throws IOException {
+    String decodeStringArray(ByteBuffer buf) throws IOException
+    {
         int len = (int) buf.getLong();
 
         byte[] bytes = new byte[len];
@@ -570,7 +651,8 @@ public class HyenaApi {
         return new String(bytes, UTF8_CHARSET);
     }
 
-    byte[] encodeByteArray(byte[] values) throws IOException {
+    byte[] encodeByteArray(byte[] values) throws IOException
+    {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(baos);
         dos.writeLong(values.length);
@@ -584,5 +666,4 @@ public class HyenaApi {
 
         return baos.toByteArray();
     }
-
 }
