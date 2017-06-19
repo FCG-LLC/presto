@@ -1,6 +1,25 @@
 cd $WORKSPACE/source
 
-docker build -t presto-builder .
+DOCKER_OPTIONS=""
+
+if [[ $nocache == "true" ]]
+then
+	echo "Doing clean build"
+	DOCKER_OPTIONS="--no-cache"
+	docker pull portus.cs.int:5000/prod/cs-dbuild-japps
+else
+	echo "Using cache"
+fi
+
+docker build $DOCKER_OPTIONS -t presto-builder .
+
+RC=$?
+
+if [[ $RC != 0 ]]
+then
+	echo "Build creation failed"
+	exit $RC
+fi
 
 if test "${branch#*tags/}" != "$branch"; then
 	VERSION="target\/apache-presto-${branch#tags/}"
@@ -8,13 +27,23 @@ if test "${branch#*tags/}" != "$branch"; then
 else
 	SHORT_COMMIT=`expr substr $GIT_COMMIT 1 7`
 	VERSION="target\/apache-presto-\${project.version\}-\${maven.build.timestamp\}-$SHORT_COMMIT-$destEnv"
-    VERSION_CONTROL="Version: [[project.version]]-[[buildTimestamp]]-$SHORT_COMMIT-$destEnv"   
+	VERSION_CONTROL="Version: [[project.version]]-[[buildTimestamp]]-$SHORT_COMMIT-$destEnv"
 fi
 
 sed -i "s/Version.*/$VERSION_CONTROL/" presto-server/src/deb/control/control
 sed -i "s/<deb.*deb>/<deb>$VERSION.deb<\/deb>/" presto-server/pom.xml
 
+
+
 docker run --rm -t -v ${PWD}:/build presto-builder
+
+RC=$?
+
+if [[ $RC != 0 ]]
+then
+	echo "Build failed"
+	exit $RC
+fi
 
 cd target
 PRESTO_DEB=`ls | grep presto | grep deb`
