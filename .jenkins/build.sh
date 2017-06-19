@@ -1,5 +1,7 @@
 cd $WORKSPACE/source
 
+docker build -t presto-builder .
+
 if test "${branch#*tags/}" != "$branch"; then
 	VERSION="target\/apache-presto-${branch#tags/}"
     VERSION_CONTROL="Version: ${branch#tags/}"
@@ -11,7 +13,9 @@ fi
 
 sed -i "s/Version.*/$VERSION_CONTROL/" presto-server/src/deb/control/control
 sed -i "s/<deb.*deb>/<deb>$VERSION.deb<\/deb>/" presto-server/pom.xml
-mvn -e -DskipTests -P deb install
+
+docker run --rm -t -v ${PWD}:/build presto-builder
+
 cd target
 PRESTO_DEB=`ls | grep presto | grep deb`
 APTLY_SERVER=http://10.12.1.225:8080
