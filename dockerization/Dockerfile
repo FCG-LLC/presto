@@ -18,9 +18,16 @@ RUN apt-get update -y && \
 RUN groupadd -g 10023 presto
 RUN adduser --no-create-home --system --shell /bin/false --gecos 'presto dedicated user' --uid 10023 --gid 10023 --disabled-password presto
 
-RUN mkdir -p /presto-server/etc/catalog
+RUN apt-get install presto=*$destEnv
 
-WORKDIR /presto-server
+RUN paxctl -c /usr/lib/jvm/java-8-oracle/jre/bin/java && paxctl -m /usr/lib/jvm/java-8-oracle/jre/bin/java
+
+RUN chmod 755 /opt/presto/bin/launcher \
+              /opt/presto/bin/launcher.py
+
+RUN mkdir -p /opt/presto/etc/catalog
+
+WORKDIR /opt/presto/
 
 ADD files/etc/catalog/hyena.properties etc/catalog
 ADD files/etc/config.properties etc/
@@ -28,6 +35,4 @@ ADD files/etc/jvm.config etc/
 ADD files/etc/log.properties etc/
 ADD files/etc/node.properties etc/
 
-RUN apt-get install presto=*$destEnv
-
-RUN paxctl -c /usr/lib/jvm/java-8-oracle/jre/bin/java && paxctl -m /usr/lib/jvm/java-8-oracle/jre/bin/java
+CMD /opt/presto/bin/launcher run
