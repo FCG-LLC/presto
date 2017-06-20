@@ -26,7 +26,7 @@ if test "${branch#*tags/}" != "$branch"; then
     VERSION_CONTROL="Version: ${branch#tags/}"
 else
 	SHORT_COMMIT=`expr substr $GIT_COMMIT 1 7`
-	VERSION="target\/apache-presto-\${project.version\}-\${maven.build.timestamp\}-$SHORT_COMMIT-$destEnv"
+	VERSION="target\/apache-presto-\${project.version\}-\${buildTimestamp\}-$SHORT_COMMIT-$destEnv"
 	VERSION_CONTROL="Version: [[project.version]]-[[buildTimestamp]]-$SHORT_COMMIT-$destEnv"
 fi
 
