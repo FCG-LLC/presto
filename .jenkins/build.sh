@@ -1,3 +1,5 @@
+set -x
+
 cd $WORKSPACE/source
 
 DOCKER_OPTIONS=""
@@ -47,6 +49,10 @@ fi
 
 cd target
 PRESTO_DEB=`ls | grep presto | grep deb`
+
+### TODO THIS IS HACK, THIS MUST BE CORRECTED
+cp $PRESTO_DEB $WORKSPACE/source/dockerization
+
 APTLY_SERVER=http://10.12.1.225:8080
 curl -X POST -F file=@$PRESTO_DEB http://10.12.1.225:8080/api/files/$PRESTO_DEB
 curl -X POST http://10.12.1.225:8080/api/repos/main/file/$PRESTO_DEB
@@ -54,8 +60,7 @@ ssh -tt -i ~/.ssh/aptly_rsa yapee@10.12.1.225
 
 echo version="$VERSION" > env.properties
 
-cd $WORKSPACE/source
-cd dockerization
+cd $WORKSPACE/source/dockerization
 docker build --build-arg destEnv=$destEnv --no-cache -t cs/$app .
 docker tag cs/$app portus.cs.int:5000/$destEnv/cs-$app
 docker push portus.cs.int:5000/$destEnv/cs-$app

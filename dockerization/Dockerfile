@@ -28,6 +28,9 @@ ADD files/etc/jvm.config etc/
 ADD files/etc/log.properties etc/
 ADD files/etc/node.properties etc/
 
-RUN apt-get install presto=*$destEnv
+ADD *.deb /
+RUN dpkg --force-all -i /*.deb
+
+#RUN apt-get install presto=*$destEnv
 
 RUN paxctl -c /usr/lib/jvm/java-8-oracle/jre/bin/java && paxctl -m /usr/lib/jvm/java-8-oracle/jre/bin/java
