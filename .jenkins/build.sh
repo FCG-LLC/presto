@@ -1,3 +1,5 @@
+#!/bin/bash
+
 cd $WORKSPACE/source
 
 DOCKER_OPTIONS=""
