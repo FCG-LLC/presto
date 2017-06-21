@@ -23,7 +23,8 @@ RUN groupadd -g 10024 hyena
 RUN adduser --no-create-home --system --shell /bin/false --gecos 'hyena dedicated user' --uid 10024 --gid 10024 --disabled-password hyena
 RUN usermod -a -G hyena presto
 
-RUN apt-get install presto=*$destEnv
+RUN apt-get install -y nanomsg=*$destEnv
+RUN apt-get install -y presto=*$destEnv
 
 RUN paxctl -c /usr/lib/jvm/java-8-oracle/jre/bin/java && paxctl -m /usr/lib/jvm/java-8-oracle/jre/bin/java
 
