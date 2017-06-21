@@ -42,4 +42,5 @@ ADD files/etc/node.properties etc/
 
 RUN chown -R presto.presto /opt/presto
 
+USER presto
 CMD /opt/presto/bin/launcher run
