@@ -19,6 +19,9 @@
         <air.check.skip-dependency>true</air.check.skip-dependency>
         <air.check.skip-dependency-version-check>true</air.check.skip-dependency-version-check>
 
+        <maven.build.timestamp.format>yyMMddHHmm</maven.build.timestamp.format>
+        <buildTimestamp>${maven.build.timestamp}</buildTimestamp>
+
         <!-- Launcher properties -->
         <main-class>com.facebook.presto.server.PrestoServer</main-class>
         <process-name>${project.artifactId}</process-name>
@@ -39,7 +42,7 @@
                                     <goal>jdeb</goal>
                                 </goals>
                                 <configuration>
-                                    <deb>target/presto-${project.version}-${maven.build.timestamp}.deb</deb>
+                                    <deb>target/presto-${project.version}-${buildTimestamp}.deb</deb>
                                     <dataSet>
                                         <data>
                                             <src>target/presto-server-${project.version}</src>
