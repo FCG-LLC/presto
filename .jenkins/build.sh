@@ -1,5 +1,10 @@
 #!/bin/bash
 
+function echo_and_die() {
+    echo $1 && exit $2
+}
+
+
 cd $WORKSPACE/source
 
 DOCKER_OPTIONS=""
@@ -13,15 +18,7 @@ else
 	echo "Using cache"
 fi
 
-docker build $DOCKER_OPTIONS -t presto-builder .
-
-RC=$?
-
-if [[ $RC != 0 ]]
-then
-	echo "Build creation failed"
-	exit $RC
-fi
+docker build $DOCKER_OPTIONS -t presto-builder . || echo_and_die "Build creation failed" $?
 
 if test "${branch#*tags/}" != "$branch"; then
 	VERSION="target\/apache-presto-${branch#tags/}"
@@ -37,15 +34,7 @@ sed -i "s/<deb.*deb>/<deb>$VERSION.deb<\/deb>/" presto-server/pom.xml
 
 
 
-docker run --rm -t -v ${PWD}:/build presto-builder
-
-RC=$?
-
-if [[ $RC != 0 ]]
-then
-	echo "Build failed"
-	exit $RC
-fi
+docker run --rm -t -v ${PWD}:/build presto-builder || echo_and_die "Build failed" $?
 
 cd target
 PRESTO_DEB=`ls | grep presto | grep deb`
