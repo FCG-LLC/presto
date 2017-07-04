@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -ex
+
 function echo_and_die() {
     echo $1 && exit $2
 }
