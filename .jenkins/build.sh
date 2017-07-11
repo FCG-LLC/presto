@@ -43,7 +43,7 @@ PRESTO_DEB=`ls | grep presto | grep deb`
 APTLY_SERVER=http://10.12.1.225:8080
 curl -X POST -F file=@$PRESTO_DEB http://10.12.1.225:8080/api/files/$PRESTO_DEB
 curl -X POST http://10.12.1.225:8080/api/repos/main/file/$PRESTO_DEB
-ssh -tt -i ~/.ssh/aptly_rsa yapee@10.12.1.225
+ssh -tt -i ~/.ssh/aptly_rsa aptly@10.12.1.225
 
 echo version="$VERSION" > env.properties
 
