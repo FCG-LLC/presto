@@ -10,6 +10,9 @@ ENV LANG="en_US.UTF-8" \
     LANGUAGE="en_US:en" \
     LC_ALL="en_US.UTF-8"
 
+RUN echo "deb http://10.12.1.225/public xenial $destEnv" >> /etc/apt/sources.list
+RUN printf "Package: * \nPin: release a=xenial, o=10.12.1.225 \nPin-Priority: 1600 \n" > /etc/apt/preferences
+
 RUN apt-get update -y && \
     apt-get upgrade -y && \
     apt-get install -y \
@@ -23,8 +26,8 @@ RUN groupadd -g 10024 hyena && \
     adduser --no-create-home --system --shell /bin/false --gecos 'hyena dedicated user' --uid 10024 --gid 10024 --disabled-password hyena && \
     usermod -a -G hyena presto
 
-RUN apt-get install -y nanomsg=*$destEnv
-RUN apt-get install -y presto=*$destEnv
+RUN apt-get install -y nanomsg
+RUN apt-get install -y presto
 
 RUN paxctl -c /usr/lib/jvm/java-8-oracle/jre/bin/java && \
     paxctl -m /usr/lib/jvm/java-8-oracle/jre/bin/java
