@@ -1,5 +1,7 @@
 FROM portus.cs.int:5000/prod/cs-dbuild-japps
 
+ARG destEnv
+
 RUN apt-get update && apt-get install -y maven
 
 # UID is 1003, because builder user has UID 1003
