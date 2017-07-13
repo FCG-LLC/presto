@@ -46,6 +46,10 @@ COPY files/etc/config.properties \
      files/etc/node.properties \
      etc/
 
+RUN mkdir -p /var/presto/data && chown -R presto:presto /var/presto/data
+
+VOLUME /var/presto/data
+
 RUN chown -R presto.presto /opt/presto
 
 USER presto
