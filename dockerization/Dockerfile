@@ -39,7 +39,11 @@ RUN mkdir -p /opt/presto/etc/catalog
 
 WORKDIR /opt/presto/
 
-COPY files/etc/catalog/hyena.properties etc/catalog
+# enable DBs
+COPY files/etc/catalog/hyena.properties \
+     files/etc/catalog/topdis_postgresql.properties \
+     etc/catalog/
+
 COPY files/etc/config.properties \
      files/etc/jvm.config \
      files/etc/log.properties \
