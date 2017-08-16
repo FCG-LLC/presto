@@ -9,7 +9,7 @@ import io.airlift.slice.Slices
 
 class IpEnrichmentPlugin : Plugin {
     override fun getFunctions(): Set<Class<*>> {
-        return ImmutableSet.of(DummyFunction.javaClass)//::class.java)
+        return ImmutableSet.of(DummyFunction.Companion::class.java)//javaClass)//::class.java)
     }
 }
 
