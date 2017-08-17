@@ -13,8 +13,8 @@ class IpEnrichmentPlugin : Plugin {
     }
 }
 
-class DummyFunction {
-    companion object {
+object DummyFunction {
+//    companion object {
         @TypeParameter("T")
         @ScalarFunction("DUMMY")
         @Description("Returns dummy string")
@@ -41,5 +41,5 @@ class DummyFunction {
         fun goForDummyLong(@SqlNullable @SqlType("T") value: java.lang.Long): Slice {
             return Slices.utf8Slice("dummy")
         }
-    }
+//    }
 }
