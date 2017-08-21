@@ -13,33 +13,12 @@ class IpEnrichmentPlugin : Plugin {
     }
 }
 
+@ScalarFunction("DUMMY")
+@Description("Returns dummy string")
 object DummyFunction {
-//    companion object {
-        @TypeParameter("T")
-        @ScalarFunction("DUMMY")
-        @Description("Returns dummy string")
         @SqlType(StandardTypes.VARCHAR)
         @JvmStatic
-        fun goForDummySlice(@SqlNullable @SqlType("T") value: Slice): Slice {
-            return Slices.utf8Slice("dummy")
+        fun goForDummySlice(@SqlNullable @SqlType(StandardTypes.VARCHAR) value: Slice): Slice {
+            return Slices.utf8Slice("dummySlice")
         }
-
-        @TypeParameter("T")
-        @ScalarFunction("DUMMY")
-        @Description("Returns dummy string")
-        @SqlType(StandardTypes.VARCHAR)
-        @JvmStatic
-        fun goForDummyInt(@SqlNullable @SqlType("T") value: java.lang.Integer): Slice {
-            return Slices.utf8Slice("dummy")
-        }
-
-        @TypeParameter("T")
-        @ScalarFunction("DUMMY")
-        @Description("Returns dummy string")
-        @SqlType(StandardTypes.VARCHAR)
-        @JvmStatic
-        fun goForDummyLong(@SqlNullable @SqlType("T") value: java.lang.Long): Slice {
-            return Slices.utf8Slice("dummy")
-        }
-//    }
 }
