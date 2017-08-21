@@ -1,11 +1,10 @@
 package co.llective.presto.ip
 
 import com.facebook.presto.spi.Plugin
-
-import java.util.Collections.emptySet
+import com.google.common.collect.ImmutableSet
 
 class IpEnrichmentPlugin : Plugin {
     override fun getFunctions(): Set<Class<*>> {
-        return emptySet<Class<*>>()
+        return ImmutableSet.of(ApplicationNameFunction::class.java)
     }
 }
