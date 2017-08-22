@@ -18,7 +18,8 @@ import co.llective.presto.hyena.api.HyenaApi;
 import java.io.IOException;
 import java.util.List;
 
-public class NativeHyenaSession implements HyenaSession
+public class NativeHyenaSession
+        implements HyenaSession
 {
     private final HyenaApi hyenaApi;
     private final HyenaConfig hyenaConfig;

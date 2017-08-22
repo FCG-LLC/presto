@@ -45,7 +45,7 @@ public class HyenaTables
     @Inject
     public HyenaTables(HyenaConfig config)
     {
-       hyenaSession = new NativeHyenaSession(config);
+        hyenaSession = new NativeHyenaSession(config);
 
         schemaTableName = getSchemaTableName();
 

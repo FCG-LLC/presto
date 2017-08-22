@@ -28,7 +28,8 @@ import static com.facebook.presto.spi.transaction.IsolationLevel.READ_COMMITTED;
 import static com.facebook.presto.spi.transaction.IsolationLevel.checkConnectorSupports;
 import static java.util.Objects.requireNonNull;
 
-public class HyenaConnector implements Connector
+public class HyenaConnector
+        implements Connector
 {
     private static final Logger log = Logger.get(HyenaConnector.class);
 
