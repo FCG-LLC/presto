@@ -24,7 +24,8 @@ import java.util.Objects;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
-public class HyenaColumnHandle implements ColumnHandle
+public class HyenaColumnHandle
+        implements ColumnHandle
 {
     private final String columnName;
     private final Type columnType;
