@@ -11,26 +11,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package cs.drill.ipfun.appname;
+package co.llective.presto.ip.util
 
-import cs.drill.util.IpUtil;
+import java.util.HashMap
 
-//CHECKSTYLE:OFF
-public class SubnetV4 implements Subnet {
-  private long address;
-  private long mask;
+class HardIpCache<T> : IpCache<T> {
+    private val map = HashMap<Long, MutableMap<Long, T?>>()
 
-  public long getAddress() {
-    return address;
-  }
+    override fun get(ip1: Long, ip2: Long): T? {
+        val inner = map[ip1]
+        return if (inner == null) null else inner[ip2]
+    }
 
-  public long getMask() {
-    return mask;
-  }
-
-  public SubnetV4(String address, int maskLength) {
-    this.address = IpUtil.getLongIpV4Address(address);
-    this.mask = get32Mask(maskLength);
-  }
+    override fun put(ip1: Long, ip2: Long, value: T?) {
+        val inner = (map as MutableMap<Long, MutableMap<Long, T?>>).computeIfAbsent(ip1) { HashMap() } as HashMap<Long, T?>
+        inner.put(ip2, value)
+    }
 }
-//CHECKSTYLE:ON

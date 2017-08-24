@@ -11,9 +11,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package cs.drill.util;
+package co.llective.presto.ip.util
 
-public interface IpCache<T> {
-  T get(long ip1, long ip2);
-  void put(long ip1, long ip2, T value);
+interface IpCache<T> {
+    operator fun get(ip1: Long, ip2: Long): T?
+    fun put(ip1: Long, ip2: Long, value: T?)
 }

@@ -1,5 +1,6 @@
 package co.llective.presto.ip
 
+import co.llective.presto.ip.appname.ApplicationNameFunction
 import com.facebook.presto.spi.Plugin
 import com.google.common.collect.ImmutableSet
 
