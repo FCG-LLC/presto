@@ -18,7 +18,7 @@ object ApplicationNameFunction {
             @SqlNullable @SqlType(StandardTypes.INTEGER) port: java.lang.Long
     ): Slice? {
         val applicationName = ApplicationNameResolver.getApplicationName(ip1.toLong(), ip2.toLong(), port.toInt())
-        return if (applicationName != null) Slices.utf8Slice(applicationName) else null
+        return applicationName?.let { Slices.utf8Slice(applicationName) }
     }
 
     @ScalarFunction("application_name")
@@ -29,7 +29,7 @@ object ApplicationNameFunction {
             @SqlNullable @SqlType(StandardTypes.BIGINT) ip2: java.lang.Long
     ): Slice? {
         val applicationName = ApplicationNameResolver.getApplicationName(ip1.toLong(), ip2.toLong())
-        return if (applicationName != null) Slices.utf8Slice(applicationName) else null
+        return applicationName?.let { Slices.utf8Slice(applicationName) }
     }
 
 }
