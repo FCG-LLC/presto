@@ -35,11 +35,11 @@ object ApplicationNameResolver {
     private val cache = SoftIpCache<String>()
 
     init {
-        populateNames()
+        populateSubnets()
         populatePortNames()
     }
 
-    private fun populateNames() {
+    private fun populateSubnets() {
         val fileReader = FileReader(FILE_NAME, "\t")
         fileReader.processFile (fun (line : Array<String>) {
             if (line.size != 2) {
@@ -116,6 +116,6 @@ object ApplicationNameResolver {
     }
 
     fun getPortName(port: Int): String? {
-        return if (port > 0 && port < portNames.size) portNames[port] else null
+        return if (port >= 0 && port < portNames.size) portNames[port] else null
     }
 }
