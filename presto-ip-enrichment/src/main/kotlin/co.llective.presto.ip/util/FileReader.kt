@@ -24,7 +24,7 @@ class FileReader(private val filePath: String, private val splitSign: String) {
             getBufferedReader(filePath).use { reader ->
                 var line = reader.readLine()
                 while (line != null) {
-                    val values = line.split(splitSign.toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
+                    val values = line.split(splitSign).toTypedArray()
                     rowConsumer(values)
                     line = reader.readLine()
                 }

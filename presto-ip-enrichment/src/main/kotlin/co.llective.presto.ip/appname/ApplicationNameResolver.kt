@@ -92,9 +92,7 @@ object ApplicationNameResolver {
     @JvmOverloads
     fun getApplicationName(ip1: Long, ip2: Long, port: Int = -1): String? {
         val cacheValue = cache[ip1, ip2]
-        if (cacheValue != null) {
-            return if (cacheValue == UNKNOWN_NAME) getPortName(port) else cacheValue
-        }
+        cacheValue?.let { return if (cacheValue == UNKNOWN_NAME) getPortName(port) else cacheValue }
 
         if (ip1 == IpUtil.WKP) {
             for ((subnet, value) in ipv4Subnets) {
@@ -105,7 +103,8 @@ object ApplicationNameResolver {
             }
         } else {
             for ((subnet, value) in ipv6Subnets) {
-                if (subnet.maskHighBits and ip1 == subnet.addressHighBits && subnet.maskLowBits and ip2 == subnet.addressLowBits) {
+                if (subnet.maskHighBits and ip1 == subnet.addressHighBits
+                        && subnet.maskLowBits and ip2 == subnet.addressLowBits) {
                     cache.put(ip1, ip2, value)
                     return value
                 }

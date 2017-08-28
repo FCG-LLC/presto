@@ -20,11 +20,11 @@ object IpUtil {
     private val IPV6_SPLIT = ":"
 
     fun getLongIpV4Address(address: String): Long {
-        val parts = address.split("\\.".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-        val lowBits = java.lang.Long.parseLong(parts[0]) shl 24
-        +(java.lang.Long.parseLong(parts[1]) shl 16)
-        +(java.lang.Long.parseLong(parts[2]) shl 8)
-        +java.lang.Long.parseLong(parts[3])
+        val parts = address.split(".").map { it.toLong() }
+        val lowBits = (parts[0] shl 24)
+            + (parts[1] shl 16)
+            + (parts[2] shl 8)
+            + parts[3]
         return lowBits
     }
 
