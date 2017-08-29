@@ -9,6 +9,12 @@ import io.airlift.slice.Slices
 
 object ApplicationNameFunction {
 
+    private val resolver = ApplicationNameResolver()
+
+    init {
+        resolver.init()
+    }
+
     @ScalarFunction("application_name")
     @SqlType(StandardTypes.VARCHAR)
     @JvmStatic
@@ -17,7 +23,7 @@ object ApplicationNameFunction {
             @SqlNullable @SqlType(StandardTypes.BIGINT) ip2: java.lang.Long,
             @SqlNullable @SqlType(StandardTypes.INTEGER) port: java.lang.Long
     ): Slice? {
-        val applicationName = ApplicationNameResolver.getApplicationName(ip1.toLong(), ip2.toLong(), port.toInt())
+        val applicationName = resolver.getApplicationName(ip1.toLong(), ip2.toLong(), port.toInt())
         return applicationName?.let { Slices.utf8Slice(applicationName) }
     }
 
@@ -28,7 +34,7 @@ object ApplicationNameFunction {
             @SqlNullable @SqlType(StandardTypes.BIGINT) ip1: java.lang.Long,
             @SqlNullable @SqlType(StandardTypes.BIGINT) ip2: java.lang.Long
     ): Slice? {
-        val applicationName = ApplicationNameResolver.getApplicationName(ip1.toLong(), ip2.toLong())
+        val applicationName = resolver.getApplicationName(ip1.toLong(), ip2.toLong())
         return applicationName?.let { Slices.utf8Slice(applicationName) }
     }
 

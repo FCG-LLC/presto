@@ -21,7 +21,7 @@ import java.net.InetAddress
 import java.net.UnknownHostException
 import java.util.*
 
-object ApplicationNameResolver {
+class ApplicationNameResolver {
     private val UNKNOWN_NAME = "" // empty string is marking ip in cache as not named
     private val FILE_NAME = "application_name.txt"
     private val PORTS_FILE_NAME = "application_ports.csv"
@@ -34,59 +34,61 @@ object ApplicationNameResolver {
      */
     private val cache = SoftIpCache<String>()
 
-    init {
-        populateSubnets()
-        populatePortNames()
+    fun init() {
+        populateSubnets(FileReader(FILE_NAME, "\t"))
+        populatePortNames(FileReader(PORTS_FILE_NAME, ","))
     }
 
-    private fun populateSubnets() {
-        val fileReader = FileReader(FILE_NAME, "\t")
-        fileReader.processFile (fun (line : Array<String>) {
-            if (line.size != 2) {
-                LOGGER.warn("Line doesn't have 2 expected columns")
-                return
-            }
+    private fun processSubnetLine(line: Array<String>) {
+        if (line.size != 2) {
+            LOGGER.warn("Line doesn't have 2 expected columns")
+            return
+        }
 
-            val subnet = line[0]
-            val applicationName = line[1]
+        val subnet = line[0]
+        val applicationName = line[1]
 
-            val index = subnet.indexOf("/")
+        val index = subnet.indexOf("/")
 
-            val address = subnet.substring(0, index)
-            val maskLength = Integer.parseInt(subnet.substring(index + 1))
+        val address = subnet.substring(0, index)
+        val maskLength = Integer.parseInt(subnet.substring(index + 1))
 
-            try {
-                val inetAddress = InetAddress.getByName(address)
+        try {
+            val inetAddress = InetAddress.getByName(address)
 
-                when (inetAddress) {
-                    is Inet4Address -> {
-                        val subnetV4 = SubnetV4(address, maskLength)
-                        ipv4Subnets.put(subnetV4, applicationName)
-                    }
-                    is Inet6Address -> {
-                        val subnetV6 = SubnetV6(address, maskLength)
-                        ipv6Subnets.put(subnetV6, applicationName)
-                    }
-                    else -> throw UnknownHostException()
+            when (inetAddress) {
+                is Inet4Address -> {
+                    val subnetV4 = SubnetV4(address, maskLength)
+                    ipv4Subnets.put(subnetV4, applicationName)
                 }
-            } catch (e: UnknownHostException) {
-                throw IllegalArgumentException("Wrong IP address " + address)
+                is Inet6Address -> {
+                    val subnetV6 = SubnetV6(address, maskLength)
+                    ipv6Subnets.put(subnetV6, applicationName)
+                }
+                else -> throw UnknownHostException()
             }
-        })
+        } catch (e: UnknownHostException) {
+            throw IllegalArgumentException("Wrong IP address " + address)
+        }
     }
 
-    private fun populatePortNames() {
-        val fileReader = FileReader(PORTS_FILE_NAME, ",")
-        fileReader.processFile (fun (line : Array<String>) {
-            if (line.size < 2) {
-                LOGGER.warn("Line doesn't have at least 2 expected columns")
-                return
-            }
+    private fun processPortLine(line: Array<String>) {
+        if (line.size < 2) {
+            LOGGER.warn("Line doesn't have at least 2 expected columns")
+            return
+        }
 
-            val port = line[0]
-            val applicationName = line[1]
-            portNames[Integer.parseInt(port)] = applicationName
-        })
+        val port = line[0]
+        val applicationName = line[1]
+        portNames[Integer.parseInt(port)] = applicationName
+    }
+
+    private fun populateSubnets(fileReader: FileReader) {
+        fileReader.processFile(this::processSubnetLine)
+    }
+
+    private fun populatePortNames(fileReader: FileReader) {
+        fileReader.processFile(this::processPortLine)
     }
 
     /**
@@ -124,7 +126,7 @@ object ApplicationNameResolver {
         return getPortName(port)
     }
 
-    fun getPortName(port: Int): String? {
+    private fun getPortName(port: Int): String? {
         return if (port >= 0 && port < portNames.size) portNames[port] else null
     }
 }
