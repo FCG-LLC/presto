@@ -42,7 +42,7 @@ class SoftIpCache<T> : IpCache<T> {
         return inner[ip2]
     }
 
-    override fun put(ip1: Long, ip2: Long, value: T?) {
+    override fun put(ip1: Long, ip2: Long, value: T) {
         val inner = getInnerMap(ip1)
         inner.put(ip2, value)
     }

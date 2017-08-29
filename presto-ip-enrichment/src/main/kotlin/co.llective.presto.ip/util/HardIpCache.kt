@@ -23,8 +23,9 @@ class HardIpCache<T> : IpCache<T> {
         return if (inner == null) null else inner[ip2]
     }
 
-    override fun put(ip1: Long, ip2: Long, value: T?) {
-        val inner = (map as MutableMap<Long, MutableMap<Long, T?>>).computeIfAbsent(ip1) { HashMap() } as HashMap<Long, T?>
+    override fun put(ip1: Long, ip2: Long, value: T) {
+        val inner = (map as MutableMap<Long, MutableMap<Long, T?>>)
+                .computeIfAbsent(ip1) { HashMap() } as HashMap<Long, T?>
         inner.put(ip2, value)
     }
 }

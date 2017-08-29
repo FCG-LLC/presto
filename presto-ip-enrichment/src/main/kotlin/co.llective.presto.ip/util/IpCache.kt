@@ -15,5 +15,5 @@ package co.llective.presto.ip.util
 
 interface IpCache<T> {
     operator fun get(ip1: Long, ip2: Long): T?
-    fun put(ip1: Long, ip2: Long, value: T?)
+    fun put(ip1: Long, ip2: Long, value: T)
 }
