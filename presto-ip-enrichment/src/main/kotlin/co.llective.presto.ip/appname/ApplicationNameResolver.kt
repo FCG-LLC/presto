@@ -89,6 +89,15 @@ object ApplicationNameResolver {
         })
     }
 
+    /**
+     * Returns application name for given ip and port.
+     * First thing taken into account while resolving is IP.
+     * If no information is found then port is defining what is the application name.
+     * @param ip1 high bits of IP (WKP when ipv4)
+     * @param ip2 low bits of IP
+     * @param port (optional) port of used application
+     * @return String with application name or null if not recognized
+     */
     @JvmOverloads
     fun getApplicationName(ip1: Long, ip2: Long, port: Int = -1): String? {
         val cacheValue = cache[ip1, ip2]
