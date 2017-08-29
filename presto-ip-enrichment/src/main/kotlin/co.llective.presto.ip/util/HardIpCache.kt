@@ -20,7 +20,7 @@ class HardIpCache<T> : IpCache<T> {
 
     override fun get(ip1: Long, ip2: Long): T? {
         val inner = map[ip1]
-        return if (inner == null) null else inner[ip2]
+        return inner?.get(ip1)
     }
 
     override fun put(ip1: Long, ip2: Long, value: T) {
