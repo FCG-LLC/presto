@@ -116,6 +116,7 @@
         <module>presto-thrift-testing-server</module>
         <module>presto-thrift-connector</module>
         <module>presto-hyena</module>
+        <module>presto-ip-enrichment</module>
     </modules>
 
     <dependencyManagement>
@@ -173,6 +174,12 @@
             <dependency>
                 <groupId>com.facebook.presto</groupId>
                 <artifactId>presto-hyena</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.facebook.presto</groupId>
+                <artifactId>presto-ip-enrichment</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

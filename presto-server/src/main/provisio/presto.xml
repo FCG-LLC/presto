@@ -163,4 +163,10 @@
             <unpack />
         </artifact>
     </artifactSet>
+
+    <artifactSet to="plugin/hyena">
+        <artifact id="${project.groupId}:presto-ip-enrichment:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
 </runtime>
