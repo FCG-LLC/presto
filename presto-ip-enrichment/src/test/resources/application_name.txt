@@ -1,0 +1,3 @@
+8.8.8.0/24	ip4_google.com
+2001:4860::/32	ip6_google.com
+127.0.0.0/24	local
