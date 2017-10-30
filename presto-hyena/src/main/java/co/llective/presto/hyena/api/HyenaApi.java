@@ -391,8 +391,7 @@ public class HyenaApi
                     rowCount,
                     colCount,
                     ScanResult.decodeColumnTypes(buf),
-                    ScanResult.decodeBlocks(buf)
-            );
+                    ScanResult.decodeBlocks(buf));
         }
     }
 
@@ -626,8 +625,7 @@ public class HyenaApi
     {
         return new Column(
                 BlockType.values()[buf.getInt()],
-                decodeStringArray(buf)
-        );
+                decodeStringArray(buf));
     }
 
     byte[] encodeStringArray(String str) throws IOException

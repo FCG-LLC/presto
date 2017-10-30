@@ -184,12 +184,6 @@ public class HyenaRecordCursor
     }
 
     @Override
-    public long getTotalBytes()
-    {
-        return this.hyenaOpMetadata.bytes;
-    }
-
-    @Override
     public long getCompletedBytes()
     {
         return this.hyenaOpMetadata.bytes;
