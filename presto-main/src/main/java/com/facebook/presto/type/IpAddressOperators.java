@@ -107,6 +107,7 @@ public final class IpAddressOperators
     @SqlType(StandardTypes.IPADDRESS)
     public static Slice castFromVarcharToIpAddress(@SqlType("varchar(x)") Slice slice)
     {
+        long startTime = System.nanoTime();
         byte[] address;
         try {
             address = InetAddresses.forString(slice.toStringUtf8()).getAddress();
@@ -129,6 +130,8 @@ public final class IpAddressOperators
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Invalid InetAddress length: " + address.length);
         }
 
+        long timeElapsed = System.nanoTime() - startTime;
+        System.out.println("Casting varchar to IpAddress took: " + timeElapsed + " nanoseconds.");
         return wrappedBuffer(bytes);
     }
 

@@ -35,7 +35,7 @@ public class HyenaApi
 
     private static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
 
-    private final ReqSocket s = new ReqSocket();
+//    private final ReqSocket s = new ReqSocket();
 
     public enum ApiRequest
     {
@@ -235,6 +235,7 @@ public class HyenaApi
     {
         public BlockType type;
         public DenseBlock<Long> int64DenseBlock;
+        public DenseBlock<byte[]> byte128DenseBlock;
         public SparseBlock<Long> int64SparseBlock;
         public SparseBlock<Integer> int32SparseBlock;
         public SparseBlock<Short> int16SparseBlock;
@@ -246,6 +247,9 @@ public class HyenaApi
         {
             int count = 0;
             switch(type) {
+                case Byte128Dense:
+                    count = byte128DenseBlock.data.size();
+                    break;
                 case Int8Sparse:
                     count = int8SparseBlock.offsetData.size();
                     break;
@@ -397,6 +401,7 @@ public class HyenaApi
 
     public enum BlockType
     {
+        Byte128Dense,
         Int64Dense,
         Int64Sparse,
         Int32Sparse,
@@ -468,7 +473,7 @@ public class HyenaApi
         }
     }
 
-    private boolean connected = false;
+    private boolean connected = true;
 
     private synchronized void ensureConnected()
     {
@@ -479,17 +484,18 @@ public class HyenaApi
 
     public void connect(String url) throws IOException
     {
-        log.info("Opening new connection to: " + url);
-        s.setRecvTimeout(60000);
-        s.setSendTimeout(60000);
-        s.connect(url);
-        log.info("Connection successfully opened");
+//        log.info("Opening new connection to: " + url);
+//        s.setRecvTimeout(60000);
+//        s.setSendTimeout(60000);
+//        s.connect(url);
+//        log.info("Connection successfully opened");
+      log.info("Mocked connection");
         this.connected = true;
     }
 
     public void close()
     {
-        s.close();
+//        s.close();
     }
 
     public static class HyenaOpMetadata
@@ -499,39 +505,55 @@ public class HyenaApi
 
     public ScanResult scan(ScanRequest req, HyenaOpMetadata metaOrNull) throws IOException
     {
-        ensureConnected();
-
-        s.send(buildScanMessage(req));
-        log.info("Sent scan request to partition " + req.partitionId);
-        try {
-            log.info("Waiting for scan response from partition " + req.partitionId);
-            ByteBuffer buf = s.recv();
-            log.info("Received scan response from partition " + req.partitionId);
-            buf.order(ByteOrder.LITTLE_ENDIAN);
-
-            ScanResult result = ScanResult.decode(buf);
-
-            if (metaOrNull != null) {
-                metaOrNull.bytes = buf.position();
-            }
-
-            return result;
-        }
-        catch (Throwable t) {
-            log.error("Nanomsg error: " + Nanomsg.getError());
-            throw new IOException("Nanomsg error: " + Nanomsg.getError(), t);
-        }
+      ScanResult result = new ScanResult(1, 1, Arrays.asList(Pair.of(0, BlockType.Byte128Dense)), Arrays.asList(new BlockHolder()));
+      String[] str = new String[]{"9B", "7D", "2C", "34", "A3", "66", "BF", "89", "0C", "73", "06", "41", "E6", "CE", "CF", "6F"};
+      byte[] bytes = new byte[16];
+      for (int i = 0; i < 16; i++) {
+//        bytes[i] = Byte.parseByte(str[i]);
+        bytes[i] = Byte.parseByte("0");
+      }
+      bytes[15] = 1;
+      result.blocks.get(0).byte128DenseBlock = new HyenaApi.DenseBlock<>(1);
+      result.blocks.get(0).byte128DenseBlock.data.add(bytes);
+      result.blocks.get(0).type = BlockType.Byte128Dense;
+      return result;
+//        ensureConnected();
+//
+////        s.send(buildScanMessage(req));
+//        log.info("Sent scan request to partition " + req.partitionId);
+//        try {
+//            log.info("Waiting for scan response from partition " + req.partitionId);
+////            ByteBuffer buf = s.recv();
+//            log.info("Received scan response from partition " + req.partitionId);
+//            buf.order(ByteOrder.LITTLE_ENDIAN);
+//
+//            ScanResult result = ScanResult.decode(buf);
+//
+//            if (metaOrNull != null) {
+//                metaOrNull.bytes = buf.position();
+//            }
+//
+//            return result;
+//        }
+//        catch (Throwable t) {
+//            log.error("Nanomsg error: " + Nanomsg.getError());
+//            throw new IOException("Nanomsg error: " + Nanomsg.getError(), t);
+//        }
     }
 
     public Catalog refreshCatalog() throws IOException
     {
         ensureConnected();
 
-        s.send(buildRefreshCatalogMessage());
-
-        ByteBuffer buf = s.recv();
-        buf.order(ByteOrder.LITTLE_ENDIAN);
-        return decodeRefreshCatalog(buf);
+//        s.send(buildRefreshCatalogMessage());
+//
+//        ByteBuffer buf = s.recv();
+//        buf.order(ByteOrder.LITTLE_ENDIAN);
+        Catalog catalog = new Catalog(
+            Arrays.asList(new Column(BlockType.Byte128Dense, "ip")),
+            Arrays.asList(new PartitionInfo(0, 1000, 1, "")));
+        return catalog;
+//        return decodeRefreshCatalog(buf);
     }
 
     byte[] buildRefreshCatalogMessage() throws IOException

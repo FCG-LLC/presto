@@ -26,12 +26,9 @@ import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
@@ -40,6 +37,7 @@ import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.slice.Slices.utf8Slice;
+import static io.airlift.slice.Slices.wrappedBuffer;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -57,8 +55,12 @@ public class HyenaRecordCursor
     private List<String> fields;
     private int foobar = 0;
 
-    private final HyenaApi.ScanResult result;
-    private int rowPosition;
+    private final HyenaApi.ScanResult result;// = new HyenaApi.ScanResult(
+//        1,
+//        1,
+//        Arrays.asList(Pair.of(0, HyenaApi.BlockType.Byte128Dense)),
+//        Arrays.asList(new HyenaApi.BlockHolder()));
+    private int rowPosition = -1;
 
     public HyenaRecordCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, HostAddress address, Long partitionId, TupleDomain<HyenaColumnHandle> predicate)
     {
@@ -247,11 +249,14 @@ public class HyenaRecordCursor
     public Slice getSlice(int field)
     {
         HyenaApi.BlockHolder holder = getBlockHolder(field);
-        if (holder.type != HyenaApi.BlockType.String) {
-            throw new RuntimeException("Expected String block type. Found " + holder.type.name() + " instead");
+        if (holder.type.equals(HyenaApi.BlockType.Byte128Dense)) {
+          return wrappedBuffer(holder.byte128DenseBlock.get(rowPosition));
+        }
+        if (holder.type.equals(HyenaApi.BlockType.String)) {
+          return utf8Slice(holder.stringBlock.getMaybe(rowPosition));
         }
 
-        return utf8Slice(holder.stringBlock.getMaybe(rowPosition));
+        throw new RuntimeException("Expected String block type. Found " + holder.type.name() + " instead");
     }
 
     @Override
@@ -297,6 +302,6 @@ public class HyenaRecordCursor
     @Override
     public void close()
     {
-        this.hyenaSession.close();
+//        this.hyenaSession.close();
     }
 }

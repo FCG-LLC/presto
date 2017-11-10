@@ -14,9 +14,11 @@
 package co.llective.presto.hyena;
 
 import co.llective.presto.hyena.api.HyenaApi;
+import co.llective.presto.hyena.type.IpAddressType;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spi.type.VarbinaryType;
 import com.google.common.collect.ImmutableMap;
 
 import javax.inject.Inject;
@@ -50,7 +52,10 @@ public class HyenaTables
         schemaTableName = getSchemaTableName();
 
         ImmutableMap.Builder<SchemaTableName, List<ColumnMetadata>> tableColumnsBuilder = ImmutableMap.builder();
-        tableColumnsBuilder.put(schemaTableName, tableColumns(hyenaSession.getAvailableColumns()));
+
+        List<HyenaApi.Column> availableColumns = Arrays.asList(new HyenaApi.Column(HyenaApi.BlockType.Byte128Dense, "ip"));
+        tableColumnsBuilder.put(schemaTableName, tableColumns(availableColumns));
+//        tableColumnsBuilder.put(schemaTableName, tableColumns(hyenaSession.getAvailableColumns()));
         tableColumns = tableColumnsBuilder.build();
 
         tableHandle = new HyenaTableHandle(schemaTableName);
@@ -73,6 +78,9 @@ public class HyenaTables
                 return BIGINT;
             case String:
                 return VARCHAR;
+            case Byte128Dense:
+                return IpAddressType.IPADDRESS;
+//                return VarbinaryType.VARBINARY;
             default:
                 throw new RuntimeException("I don't know how to handle " + blockType.toString());
         }
