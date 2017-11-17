@@ -13,7 +13,8 @@
  */
 package co.llective.presto.hyena;
 
-import co.llective.presto.hyena.api.HyenaApi;
+import co.llective.hyena.api.BlockType;
+import co.llective.hyena.api.Column;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.type.Type;
@@ -61,15 +62,26 @@ public class HyenaTables
         return new SchemaTableName(PRESTO_HYENA_SCHEMA, PRESTO_HYENA_TABLE_NAME);
     }
 
-    private Type convertBlockType(HyenaApi.BlockType blockType)
+    private Type convertBlockType(BlockType blockType)
     {
         switch (blockType) {
-            case Int8Sparse:
-            case Int16Sparse:
-            case Int32Sparse:
+            case I8Sparse:
+            case I8Dense:
+            case I16Sparse:
+            case I16Dense:
+            case I32Sparse:
+            case I32Dense:
+            case U8Sparse:
+            case U8Dense:
+            case U16Sparse:
+            case U16Dense:
+            case U32Sparse:
+            case U32Dense:
                 return INTEGER;
-            case Int64Dense:
-            case Int64Sparse:
+            case I64Dense:
+            case I64Sparse:
+            case U64Dense:
+            case U64Sparse:
                 return BIGINT;
             case String:
                 return VARCHAR;
@@ -78,12 +90,12 @@ public class HyenaTables
         }
     }
 
-    private ColumnMetadata convertColumnMetadata(HyenaApi.Column col)
+    private ColumnMetadata convertColumnMetadata(Column col)
     {
-        return new ColumnMetadata(col.name, convertBlockType(col.dataType));
+        return new ColumnMetadata(col.getName(), convertBlockType(col.getDataType()));
     }
 
-    private List<ColumnMetadata> tableColumns(List<HyenaApi.Column> hyenaColumns)
+    private List<ColumnMetadata> tableColumns(List<Column> hyenaColumns)
     {
         return hyenaColumns.stream().map(hyenaCol -> convertColumnMetadata(hyenaCol)).collect(Collectors.toList());
     }

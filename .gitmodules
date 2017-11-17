@@ -1,3 +1,6 @@
 [submodule ".ci-utils"]
 	path = .ci-utils
 	url = git@github.com:FCG-LLC/ci-utils.git
+[submodule "presto-hyena/hyena-api"]
+	path = presto-hyena/hyena-api
+	url = git@github.com:FCG-LLC/hyena-api.git

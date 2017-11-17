@@ -29,7 +29,7 @@ public class HyenaColumnHandle
 {
     private final String columnName;
     private final Type columnType;
-    private final int ordinalPosition;
+    private final long ordinalPosition;
 
     @JsonCreator
     public HyenaColumnHandle(
@@ -55,7 +55,7 @@ public class HyenaColumnHandle
     }
 
     @JsonProperty
-    public int getOrdinalPosition()
+    public long getOrdinalPosition()
     {
         return ordinalPosition;
     }

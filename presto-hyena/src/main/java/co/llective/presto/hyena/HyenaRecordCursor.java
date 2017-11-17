@@ -13,7 +13,19 @@
  */
 package co.llective.presto.hyena;
 
-import co.llective.presto.hyena.api.HyenaApi;
+import co.llective.hyena.api.Block;
+import co.llective.hyena.api.BlockHolder;
+import co.llective.hyena.api.BlockType;
+import co.llective.hyena.api.DenseBlock;
+import co.llective.hyena.api.FilterType;
+import co.llective.hyena.api.HyenaApi;
+import co.llective.hyena.api.ScanComparison;
+import co.llective.hyena.api.ScanFilter;
+import co.llective.hyena.api.ScanFilterBuilder;
+import co.llective.hyena.api.ScanRequest;
+import co.llective.hyena.api.ScanResult;
+import co.llective.hyena.api.SparseBlock;
+import co.llective.hyena.api.StringBlock;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.predicate.Domain;
@@ -27,11 +39,13 @@ import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import org.apache.commons.lang3.StringUtils;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
@@ -46,10 +60,10 @@ import static java.util.Objects.requireNonNull;
 public class HyenaRecordCursor
         implements RecordCursor
 {
-    private static final Logger log = Logger.get(HyenaApi.class);
+    private static final Logger log = Logger.get(HyenaRecordCursor.class);
 
     private final List<HyenaColumnHandle> columns;
-    private final Long partitionId;
+    private final UUID partitionId;
     private final TupleDomain<HyenaColumnHandle> predicate;
     private final HyenaSession hyenaSession;
     private HyenaApi.HyenaOpMetadata hyenaOpMetadata;
@@ -57,25 +71,26 @@ public class HyenaRecordCursor
     private List<String> fields;
     private int foobar = 0;
 
-    private final HyenaApi.ScanResult result;
+    private final ScanResult result;
     private int rowPosition;
+    private final int rowCount;
 
-    public HyenaRecordCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, HostAddress address, Long partitionId, TupleDomain<HyenaColumnHandle> predicate)
+    public HyenaRecordCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, HostAddress address, UUID partitionId, TupleDomain<HyenaColumnHandle> predicate)
     {
         HyenaSession baseSession = requireNonNull(hyenaSession, "hyenaSession is null");
         this.columns = requireNonNull(columns, "columns is null");
         this.partitionId = requireNonNull(partitionId, "partitionId is null");
         this.predicate = requireNonNull(predicate, "predicate is null");
 
-        HyenaApi.ScanRequest req = new HyenaApi.ScanRequest();
-        req.minTs = 0;
-        req.maxTs = Long.MAX_VALUE;
-        req.partitionId = partitionId;
-        req.projection = new ArrayList<>();
-        req.filters = new ArrayList<>();
+        ScanRequest req = new ScanRequest();
+        req.setMinTs(0);
+        req.setMaxTs(Long.MAX_VALUE);
+        req.setPartitionId(partitionId);
+        req.setProjection(new ArrayList<>());
+        req.setFilters(new ArrayList<>());
 
         for (HyenaColumnHandle col : columns) {
-            req.projection.add(col.getOrdinalPosition());
+            req.getProjection().add(col.getOrdinalPosition());
         }
 
         if (predicate.getColumnDomains().isPresent()) {
@@ -91,62 +106,62 @@ public class HyenaRecordCursor
                                 if (range.isSingleValue()) {
                                     if (column.getColumnType() == VARCHAR) {
                                         Slice val = (Slice) range.getSingleValue();
-                                        req.filters.add(new HyenaApi.ScanFilter(column.getOrdinalPosition(), HyenaApi.ScanComparison.Eq, 0, val.toStringUtf8()));
+                                        req.getFilters().add(new ScanFilter(column.getOrdinalPosition(), ScanComparison.Eq, FilterType.String, val, Optional.of(val.toStringUtf8())));
                                     }
                                     else {
                                         Long val = (Long) range.getSingleValue();
-                                        req.filters.add(new HyenaApi.ScanFilter(column.getOrdinalPosition(), HyenaApi.ScanComparison.Eq, val, ""));
+                                        req.getFilters().add(new ScanFilter(column.getOrdinalPosition(), ScanComparison.Eq, FilterType.I64, val, Optional.of("")));
                                     }
                                 }
                                 else {
                                     if (range.getHigh().getValueBlock().isPresent()) {
                                         Marker high = range.getHigh();
 
-                                        HyenaApi.ScanFilterBuilder builder = new HyenaApi.ScanFilterBuilder().withColumn(column.getOrdinalPosition());
+                                        ScanFilterBuilder builder = new ScanFilterBuilder(hyenaSession.refreshCatalog()).withColumn(column.getOrdinalPosition());
 
                                         if (high.getBound() == Marker.Bound.BELOW) {
-                                            builder.withOp(HyenaApi.ScanComparison.Lt);
+                                            builder = builder.withOp(ScanComparison.Lt);
                                         }
                                         else if (high.getBound() == Marker.Bound.EXACTLY) {
-                                            builder.withOp(HyenaApi.ScanComparison.LtEq);
+                                            builder = builder.withOp(ScanComparison.LtEq);
                                         }
                                         else {
                                             throw new UnsupportedOperationException("We don't know how to handle this yet - high values and neither below nor exactly marker present?");
                                         }
 
                                         if (column.getColumnType() == VARCHAR) {
-                                            builder.withStringValue(((Slice) high.getValue()).toStringUtf8());
+                                            builder = builder.withStringValue(((Slice) high.getValue()).toStringUtf8());
                                         }
                                         else {
-                                            builder.withLongValue((Long) high.getValue());
+                                            builder = builder.withValue((Long) high.getValue());
                                         }
 
-                                        req.filters.add(builder.build());
+                                        req.getFilters().add(builder.build());
                                     }
 
                                     if (range.getLow().getValueBlock().isPresent()) {
-                                        HyenaApi.ScanFilterBuilder builder = new HyenaApi.ScanFilterBuilder().withColumn(column.getOrdinalPosition());
+                                        ScanFilterBuilder builder = new ScanFilterBuilder(hyenaSession.refreshCatalog()).withColumn(column.getOrdinalPosition());
 
                                         Marker low = range.getLow();
 
                                         if (low.getBound() == Marker.Bound.ABOVE) {
-                                            builder.withOp(HyenaApi.ScanComparison.Gt);
+                                            builder = builder.withOp(ScanComparison.Gt);
                                         }
                                         else if (low.getBound() == Marker.Bound.EXACTLY) {
-                                            builder.withOp(HyenaApi.ScanComparison.GtEq);
+                                            builder = builder.withOp(ScanComparison.GtEq);
                                         }
                                         else {
                                             throw new UnsupportedOperationException("We don't know how to handle this yet - low values and neither above nor exactly marker present?");
                                         }
 
                                         if (column.getColumnType() == VARCHAR) {
-                                            builder.withStringValue(((Slice) low.getValue()).toStringUtf8());
+                                            builder = builder.withStringValue(((Slice) low.getValue()).toStringUtf8());
                                         }
                                         else {
-                                            builder.withLongValue((Long) low.getValue());
+                                            builder = builder.withValue((Long) low.getValue());
                                         }
 
-                                        req.filters.add(builder.build());
+                                        req.getFilters().add(builder.build());
                                     }
                                 }
                             }
@@ -162,11 +177,22 @@ public class HyenaRecordCursor
             }
         }
 
-        log.info("Filters: " + StringUtils.join(req.filters, ", "));
+        log.info("Filters: " + StringUtils.join(req.getFilters(), ", "));
 
         this.hyenaSession = baseSession.recordSetProviderSession();
         hyenaOpMetadata = new HyenaApi.HyenaOpMetadata();
         result = this.hyenaSession.scan(req, hyenaOpMetadata);
+        rowCount = getRowCount(result);
+    }
+
+    private int getRowCount(ScanResult result)
+    {
+        if (result.getData().isEmpty()) {
+            return 0;
+        }
+        return result.getData().get(0).getData()
+            .map(bh -> bh.getBlock().count())
+            .orElse(0);
     }
 
     private void preparePredicates(TupleDomain<HyenaColumnHandle> predicate)
@@ -178,15 +204,10 @@ public class HyenaRecordCursor
         // SUMTHIN
     }
 
-    private HyenaApi.BlockHolder getBlockHolder(int col)
-    {
-        return this.result.blocks.get(col);
-    }
-
     @Override
     public long getCompletedBytes()
     {
-        return this.hyenaOpMetadata.bytes;
+        return this.hyenaOpMetadata.getBytes();
     }
 
     @Override
@@ -205,7 +226,7 @@ public class HyenaRecordCursor
     @Override
     public boolean advanceNextPosition()
     {
-        return ++rowPosition < result.rowCount;
+        return ++rowPosition < rowCount;
     }
 
     @Override
@@ -220,18 +241,29 @@ public class HyenaRecordCursor
     {
         checkFieldType(field, BIGINT, INTEGER);
 
-        HyenaApi.BlockHolder holder = getBlockHolder(field);
-        switch (holder.type) {
-            case Int64Dense:
-                return holder.int64DenseBlock.get(rowPosition);
-            case Int64Sparse:
-                return holder.int64SparseBlock.getMaybe(rowPosition);
-            case Int32Sparse:
-                return holder.int32SparseBlock.getMaybe(rowPosition);
-            case Int16Sparse:
-                return holder.int16SparseBlock.getMaybe(rowPosition);
-            case Int8Sparse:
-                return holder.int8SparseBlock.getMaybe(rowPosition);
+        BlockHolder holder = getBlockHolderOrThrow(field);
+        Block block = holder.getBlock();
+        switch (holder.getType()) {
+            case I64Dense:
+            case I32Dense:
+            case I16Dense:
+            case I8Dense:
+            case U32Dense:
+            case U16Dense:
+            case U8Dense:
+                return ((DenseBlock<Long>) block).getData().get(rowPosition);
+            case U64Dense:
+                return ((DenseBlock<BigInteger>) block).getData().get(rowPosition).longValue();
+            case I64Sparse:
+            case I32Sparse:
+            case I16Sparse:
+            case I8Sparse:
+            case U32Sparse:
+            case U16Sparse:
+            case U8Sparse:
+                return ((SparseBlock<Long>) block).getMaybe(rowPosition).get();
+            case U64Sparse:
+                return ((SparseBlock<BigInteger>) block).getMaybe(rowPosition).get().longValue();
         }
         throw new RuntimeException("Bad type");
     }
@@ -246,12 +278,20 @@ public class HyenaRecordCursor
     @Override
     public Slice getSlice(int field)
     {
-        HyenaApi.BlockHolder holder = getBlockHolder(field);
-        if (holder.type != HyenaApi.BlockType.String) {
-            throw new RuntimeException("Expected String block type. Found " + holder.type.name() + " instead");
+        BlockHolder holder = getBlockHolderOrThrow(field);
+
+        if (holder.getType() != BlockType.String) {
+            throw new RuntimeException("Expected String block type. Found " + holder.getType().name() + " instead");
         }
 
-        return utf8Slice(holder.stringBlock.getMaybe(rowPosition));
+        StringBlock block = (StringBlock) holder.getBlock();
+        Optional<String> value = block.getMaybe(rowPosition);
+        if (value.isPresent()) {
+            return utf8Slice(block.getMaybe(rowPosition).get());
+        }
+        else {
+            return null;
+        }
     }
 
     @Override
@@ -263,23 +303,35 @@ public class HyenaRecordCursor
     @Override
     public boolean isNull(int field)
     {
-        HyenaApi.BlockHolder holder = getBlockHolder(field);
-        switch (holder.type) {
-//            case Int64Dense:
-//                return holder.int64DenseBlock.data.size() >= rowPosition;
-            case Int64Sparse:
-                return holder.int64SparseBlock.getMaybe(rowPosition) == null;
-            case Int32Sparse:
-                return holder.int32SparseBlock.getMaybe(rowPosition) == null;
-            case Int16Sparse:
-                return holder.int16SparseBlock.getMaybe(rowPosition) == null;
-            case Int8Sparse:
-                return holder.int8SparseBlock.getMaybe(rowPosition) == null;
+        BlockHolder holder = getBlockHolderOrThrow(field);
+
+        switch (holder.getType()) {
+            case U64Sparse:
+            case U32Sparse:
+            case U16Sparse:
+            case U8Sparse:
+            case I64Sparse:
+            case I32Sparse:
+            case I16Sparse:
+            case I8Sparse:
+                SparseBlock sparseBlock = (SparseBlock) holder.getBlock();
+                return !sparseBlock.getMaybe(rowPosition).isPresent();
             case String:
-                return holder.stringBlock.getMaybe(rowPosition) == null;
+                StringBlock stringBlock = (StringBlock) holder.getBlock();
+                return !stringBlock.getMaybe(rowPosition).isPresent();
         }
 
         return false;
+    }
+
+    private BlockHolder getBlockHolderOrThrow(int field)
+    {
+        Optional<BlockHolder> optionalHolder = this.result.getData().get(field).getData();
+        if (!optionalHolder.isPresent()) {
+            throw new RuntimeException("Empty block holder");
+        }
+
+        return optionalHolder.get();
     }
 
     private void checkFieldType(int field, Type... expected)

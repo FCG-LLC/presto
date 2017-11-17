@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 
 import java.util.List;
+import java.util.UUID;
 
 import static java.util.Objects.requireNonNull;
 
@@ -32,7 +33,7 @@ public class HyenaRecordSet
     private final List<Type> columnTypes;
     private final HostAddress address;
     private final TupleDomain<HyenaColumnHandle> effectivePredicate;
-    private final Long partitionId;
+    private final UUID partitionId;
     private final HyenaSession hyenaSession;
 
     public HyenaRecordSet(HyenaSession hyenaSession, HyenaSplit split, List<HyenaColumnHandle> columns)

@@ -21,6 +21,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 
 import java.util.List;
+import java.util.UUID;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
@@ -29,13 +30,13 @@ public class HyenaSplit
         implements ConnectorSplit
 {
     private final HostAddress address;
-    private final Long partitionId;
+    private final UUID partitionId;
     private final TupleDomain<HyenaColumnHandle> effectivePredicate;
 
     @JsonCreator
     public HyenaSplit(
             @JsonProperty("address") HostAddress address,
-            @JsonProperty("partitionId") Long partitionId,
+            @JsonProperty("partitionId") UUID partitionId,
             @JsonProperty("effectivePredicate") TupleDomain<HyenaColumnHandle> effectivePredicate)
     {
         this.address = requireNonNull(address, "address is null");
@@ -50,7 +51,7 @@ public class HyenaSplit
     }
 
     @JsonProperty
-    public Long getPartitionId()
+    public UUID getPartitionId()
     {
         return partitionId;
     }

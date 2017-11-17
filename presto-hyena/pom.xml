@@ -51,10 +51,11 @@
             <artifactId>javax.inject</artifactId>
         </dependency>
 
+        <!-- Hyena-api from local repo -->
         <dependency>
-            <groupId>jnanomsg</groupId>
-            <artifactId>jnanomsg</artifactId>
-            <version>0.4.3</version>
+            <groupId>co.llective.hyena</groupId>
+            <artifactId>hyena-api-all</artifactId>
+            <version>0.1-SNAPSHOT</version>
         </dependency>
 
         <!-- Presto SPI -->
@@ -109,4 +110,41 @@
             <url>http://clojars.org/repo</url>
         </repository>
     </repositories>
+
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>1.6.0</version>
+                <groupId>org.codehaus.mojo</groupId>
+                <executions>
+                    <execution>
+                        <id>Installing hyena-api submodule dependency</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>bash</executable>
+                            <commandlineArgs>install_hyena_api.sh</commandlineArgs>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.ning.maven.plugins</groupId>
+                <artifactId>maven-duplicate-finder-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <skip>true</skip>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

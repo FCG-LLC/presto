@@ -13,10 +13,18 @@
  */
 package co.llective.presto.hyena;
 
-import co.llective.presto.hyena.api.HyenaApi;
+import co.llective.hyena.api.Catalog;
+import co.llective.hyena.api.Column;
+import co.llective.hyena.api.HyenaApi;
+import co.llective.hyena.api.PartitionInfo;
+import co.llective.hyena.api.ReplyException;
+import co.llective.hyena.api.ScanRequest;
+import co.llective.hyena.api.ScanResult;
 
 import java.io.IOException;
 import java.util.List;
+
+import static java.lang.Math.toIntExact;
 
 public class NativeHyenaSession
         implements HyenaSession
@@ -29,16 +37,22 @@ public class NativeHyenaSession
         hyenaConfig = config;
         hyenaApi = new HyenaApi();
         try {
+            System.out.println("Connecting to new instance");
             hyenaApi.connect(config.getHyenaHost());
         }
         catch (IOException ioe) {
-            throw new RuntimeException(ioe);
+            throw new RuntimeException("Couldn't connect to hyena: " + config.getHyenaHost(), ioe);
         }
     }
 
     public void close()
     {
-        hyenaApi.close();
+        try {
+            hyenaApi.close();
+        }
+        catch (IOException ioe) {
+            throw new RuntimeException("Error while closing connection to hyena", ioe);
+        }
     }
 
     @Override
@@ -47,37 +61,40 @@ public class NativeHyenaSession
         return new NativeHyenaSession(hyenaConfig);
     }
 
-    private HyenaApi.Catalog refreshCatalog()
+    @Override
+    public Catalog refreshCatalog()
     {
         // TODO: catalog caching
         try {
             return hyenaApi.refreshCatalog();
         }
-        catch (IOException ioe) {
-            throw new RuntimeException(ioe);
+        catch (IOException | ReplyException exc) {
+            throw new RuntimeException("Error while refreshing catalog", exc);
         }
     }
 
     @Override
-    public List<HyenaApi.Column> getAvailableColumns()
+    public List<Column> getAvailableColumns()
     {
-        return refreshCatalog().columns;
+        List<Column> columns = refreshCatalog().getColumns();
+        columns.sort((o1, o2) -> toIntExact(o1.getId() - o2.getId()));
+        return columns;
     }
 
     @Override
-    public List<HyenaApi.PartitionInfo> getAvailablePartitions()
+    public List<PartitionInfo> getAvailablePartitions()
     {
-        return refreshCatalog().availablePartitions;
+        return refreshCatalog().getAvailablePartitions();
     }
 
     @Override
-    public HyenaApi.ScanResult scan(HyenaApi.ScanRequest req, HyenaApi.HyenaOpMetadata metadata)
+    public ScanResult scan(ScanRequest req, HyenaApi.HyenaOpMetadata metadata)
     {
         try {
             return hyenaApi.scan(req, metadata);
         }
-        catch (IOException ioe) {
-            throw new RuntimeException(ioe);
+        catch (IOException | ReplyException exc) {
+            throw new RuntimeException("Error while scanning", exc);
         }
     }
 }
