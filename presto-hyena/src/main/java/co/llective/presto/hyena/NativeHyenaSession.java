@@ -22,9 +22,8 @@ import co.llective.hyena.api.ScanRequest;
 import co.llective.hyena.api.ScanResult;
 
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.List;
-
-import static java.lang.Math.toIntExact;
 
 public class NativeHyenaSession
         implements HyenaSession
@@ -37,7 +36,6 @@ public class NativeHyenaSession
         hyenaConfig = config;
         hyenaApi = new HyenaApi();
         try {
-            System.out.println("Connecting to new instance");
             hyenaApi.connect(config.getHyenaHost());
         }
         catch (IOException ioe) {
@@ -77,7 +75,7 @@ public class NativeHyenaSession
     public List<Column> getAvailableColumns()
     {
         List<Column> columns = refreshCatalog().getColumns();
-        columns.sort((o1, o2) -> toIntExact(o1.getId() - o2.getId()));
+        columns.sort(Comparator.comparing(Column::getId));
         return columns;
     }
 

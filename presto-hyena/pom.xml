@@ -114,24 +114,6 @@
     <build>
         <plugins>
             <plugin>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>1.6.0</version>
-                <groupId>org.codehaus.mojo</groupId>
-                <executions>
-                    <execution>
-                        <id>Installing hyena-api submodule dependency</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <configuration>
-                            <executable>bash</executable>
-                            <commandlineArgs>install_hyena_api.sh</commandlineArgs>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
                 <groupId>com.ning.maven.plugins</groupId>
                 <artifactId>maven-duplicate-finder-plugin</artifactId>
                 <executions>
