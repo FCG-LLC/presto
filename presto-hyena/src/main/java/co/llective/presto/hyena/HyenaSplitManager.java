@@ -27,11 +27,11 @@ import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import io.airlift.log.Logger;
 import org.apache.commons.lang3.tuple.Pair;
 
 import javax.inject.Inject;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -146,7 +146,7 @@ public class HyenaSplitManager
         Node currentNode = nodeManager.getCurrentNode();
         List<ConnectorSplit> splits = partitions.stream()
                 .filter(partitionInfo -> !prunePartitionOnTs(partitionInfo, tsRanges))
-                .map(partition -> new HyenaSplit(currentNode.getHostAndPort(), partition.getId(), effectivePredicate))
+                .map(partition -> new HyenaSplit(currentNode.getHostAndPort(), Sets.newHashSet(partition.getId()), effectivePredicate))
                 .collect(Collectors.toList());
 
         return new FixedSplitSource(splits);

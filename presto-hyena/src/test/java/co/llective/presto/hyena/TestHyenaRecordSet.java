@@ -17,6 +17,7 @@ import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.predicate.TupleDomain;
+import com.google.common.collect.Sets;
 import org.testng.annotations.Test;
 
 import java.util.List;
@@ -52,7 +53,7 @@ public class TestHyenaRecordSet
                 .values().stream().map(column -> (HyenaColumnHandle) column)
                 .collect(Collectors.toList());
 
-        HyenaRecordSet recordSet = new HyenaRecordSet(hyenaSession, new HyenaSplit(address, UUID.randomUUID(), TupleDomain.all()), columnHandles);
+        HyenaRecordSet recordSet = new HyenaRecordSet(hyenaSession, new HyenaSplit(address, Sets.newHashSet(UUID.randomUUID()), TupleDomain.all()), columnHandles);
         RecordCursor cursor = recordSet.cursor();
 
         for (int i = 0; i < columnHandles.size(); i++) {

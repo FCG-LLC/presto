@@ -63,7 +63,7 @@ public class HyenaRecordCursor
     private static final Logger log = Logger.get(HyenaRecordCursor.class);
 
     private final List<HyenaColumnHandle> columns;
-    private final UUID partitionId;
+    private final Set<UUID> partitionIds;
     private final TupleDomain<HyenaColumnHandle> predicate;
     private final HyenaSession hyenaSession;
     private HyenaApi.HyenaOpMetadata hyenaOpMetadata;
@@ -75,17 +75,17 @@ public class HyenaRecordCursor
     private int rowPosition;
     private final int rowCount;
 
-    public HyenaRecordCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, HostAddress address, UUID partitionId, TupleDomain<HyenaColumnHandle> predicate)
+    public HyenaRecordCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, HostAddress address, Set<UUID> partitionIds, TupleDomain<HyenaColumnHandle> predicate)
     {
         HyenaSession baseSession = requireNonNull(hyenaSession, "hyenaSession is null");
         this.columns = requireNonNull(columns, "columns is null");
-        this.partitionId = requireNonNull(partitionId, "partitionId is null");
+        this.partitionIds = partitionIds;
         this.predicate = requireNonNull(predicate, "predicate is null");
 
         ScanRequest req = new ScanRequest();
         req.setMinTs(0);
         req.setMaxTs(Long.MAX_VALUE);
-        req.setPartitionId(partitionId);
+        req.setPartitionIds(this.partitionIds);
         req.setProjection(new ArrayList<>());
         req.setFilters(new ArrayList<>());
 
