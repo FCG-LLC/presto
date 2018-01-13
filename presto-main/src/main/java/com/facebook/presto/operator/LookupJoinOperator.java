@@ -13,12 +13,12 @@
  */
 package com.facebook.presto.operator;
 
+import com.facebook.presto.operator.JoinProbe.JoinProbeFactory;
 import com.facebook.presto.operator.LookupJoinOperators.JoinType;
 import com.facebook.presto.operator.LookupSourceProvider.LookupSourceLease;
 import com.facebook.presto.operator.PartitionedConsumption.Partition;
 import com.facebook.presto.operator.exchange.LocalPartitionGenerator;
 import com.facebook.presto.spi.Page;
-import com.facebook.presto.spi.PageBuilder;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spiller.PartitioningSpiller;
 import com.facebook.presto.spiller.PartitioningSpiller.PartitioningSpillResult;
@@ -64,13 +64,15 @@ public class LookupJoinOperator
 
     private final JoinStatisticsCounter statisticsCounter;
 
-    private final PageBuilder pageBuilder;
+    private final LookupJoinPageBuilder pageBuilder;
 
     private final boolean probeOnOuterSide;
 
     private final ListenableFuture<LookupSourceProvider> lookupSourceProviderFuture;
     private LookupSourceProvider lookupSourceProvider;
     private JoinProbe probe;
+
+    private Page outputPage;
 
     private Optional<PartitioningSpiller> spiller = Optional.empty();
     private Optional<LocalPartitionGenerator> partitionGenerator = Optional.empty();
@@ -81,7 +83,7 @@ public class LookupJoinOperator
     private boolean unspilling;
     private boolean finished;
     private long joinPosition = -1;
-    private int joinSourcePositions = 0;
+    private int joinSourcePositions;
 
     private boolean currentProbePositionProducedRow;
 
@@ -98,6 +100,7 @@ public class LookupJoinOperator
             OperatorContext operatorContext,
             List<Type> allTypes,
             List<Type> probeTypes,
+            List<Type> buildOutputTypes,
             JoinType joinType,
             LookupSourceFactory lookupSourceFactory,
             JoinProbeFactory joinProbeFactory,
@@ -125,7 +128,7 @@ public class LookupJoinOperator
         this.statisticsCounter = new JoinStatisticsCounter(joinType);
         operatorContext.setInfoSupplier(this.statisticsCounter);
 
-        this.pageBuilder = new PageBuilder(allTypes);
+        this.pageBuilder = new LookupJoinPageBuilder(buildOutputTypes);
     }
 
     @Override
@@ -158,7 +161,7 @@ public class LookupJoinOperator
     @Override
     public boolean isFinished()
     {
-        boolean finished = this.finished && probe == null && pageBuilder.isEmpty();
+        boolean finished = this.finished && probe == null && pageBuilder.isEmpty() && outputPage == null;
 
         // if finished drop references so memory is freed early
         if (finished) {
@@ -188,7 +191,8 @@ public class LookupJoinOperator
         return !finishing
                 && lookupSourceProviderFuture.isDone()
                 && spillInProgress.isDone()
-                && probe == null;
+                && probe == null
+                && outputPage == null;
     }
 
     @Override
@@ -304,11 +308,16 @@ public class LookupJoinOperator
             processProbe();
         }
 
-        if (pageBuilder.isFull() || (!pageBuilder.isEmpty() && probe == null && finished)) {
-            Page page = pageBuilder.build();
-            pageBuilder.reset();
-            return page;
+        if (outputPage != null) {
+            verify(pageBuilder.isEmpty());
+            Page output = outputPage;
+            outputPage = null;
+            return output;
         }
+
+        // It is impossible to have probe == null && !pageBuilder.isEmpty(),
+        // because we will flush a page whenever we reach the probe end
+        verify(probe != null || pageBuilder.isEmpty());
         return null;
     }
 
@@ -417,7 +426,7 @@ public class LookupJoinOperator
         long currentJoinPosition = this.joinPosition;
         boolean currentProbePositionProducedRow = this.currentProbePositionProducedRow;
 
-        probe = null;
+        clearProbe();
 
         if (currentPosition < 0) {
             // Processing of the page hasn't been started yet.
@@ -457,7 +466,7 @@ public class LookupJoinOperator
                 }
                 if (!currentProbePositionProducedRow) {
                     currentProbePositionProducedRow = true;
-                    if (!outerJoinCurrentPosition(lookupSource)) {
+                    if (!outerJoinCurrentPosition()) {
                         break;
                     }
                 }
@@ -522,18 +531,14 @@ public class LookupJoinOperator
             if (lookupSource.isJoinPositionEligible(joinPosition, probe.getPosition(), probe.getPage())) {
                 currentProbePositionProducedRow = true;
 
-                pageBuilder.declarePosition();
-                // write probe columns
-                probe.appendTo(pageBuilder);
-                // write build columns
-                lookupSource.appendTo(joinPosition, pageBuilder, probe.getOutputChannelCount());
+                pageBuilder.appendRow(probe, lookupSource, joinPosition);
                 joinSourcePositions++;
             }
 
             // get next position on lookup side for this probe row
             joinPosition = lookupSource.getNextJoinPosition(joinPosition, probe.getPosition(), probe.getPage());
 
-            if (yieldSignal.isSet() || pageBuilder.isFull()) {
+            if (yieldSignal.isSet() || tryBuildPage()) {
                 return false;
             }
         }
@@ -546,7 +551,7 @@ public class LookupJoinOperator
     private boolean advanceProbePosition(LookupSource lookupSource)
     {
         if (!probe.advanceNextPosition()) {
-            probe = null;
+            clearProbe();
             return false;
         }
 
@@ -560,20 +565,11 @@ public class LookupJoinOperator
      *
      * @return whether pageBuilder became full
      */
-    private boolean outerJoinCurrentPosition(LookupSource lookupSource)
+    private boolean outerJoinCurrentPosition()
     {
         if (probeOnOuterSide && joinPosition < 0) {
-            // write probe columns
-            pageBuilder.declarePosition();
-            probe.appendTo(pageBuilder);
-
-            // write nulls into build columns
-            int outputIndex = probe.getOutputChannelCount();
-            for (int buildChannel = 0; buildChannel < lookupSource.getChannelCount(); buildChannel++) {
-                pageBuilder.getBlockBuilder(outputIndex).appendNull();
-                outputIndex++;
-            }
-            if (pageBuilder.isFull()) {
+            pageBuilder.appendNullForBuild(probe);
+            if (tryBuildPage()) {
                 return false;
             }
         }
@@ -649,12 +645,40 @@ public class LookupJoinOperator
 
         public SavedRow(Page page, int position, long joinPositionWithinPartition, boolean currentProbePositionProducedRow, int joinSourcePositions)
         {
-            this.row = page.mask(new int[] {position});
-            this.row.compact();
+            this.row = page.getSingleValuePage(position);
 
             this.joinPositionWithinPartition = joinPositionWithinPartition;
             this.currentProbePositionProducedRow = currentProbePositionProducedRow;
             this.joinSourcePositions = joinSourcePositions;
         }
+    }
+
+    private boolean tryBuildPage()
+    {
+        if (pageBuilder.isFull()) {
+            buildPage();
+            return true;
+        }
+        return false;
+    }
+
+    private void buildPage()
+    {
+        verify(outputPage == null);
+        verify(probe != null);
+
+        if (pageBuilder.isEmpty()) {
+            return;
+        }
+
+        outputPage = pageBuilder.build(probe);
+        pageBuilder.reset();
+    }
+
+    private void clearProbe()
+    {
+        // Before updating the probe flush the current page
+        buildPage();
+        probe = null;
     }
 }

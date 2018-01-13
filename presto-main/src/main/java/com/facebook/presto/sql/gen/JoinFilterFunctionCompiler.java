@@ -34,7 +34,6 @@ import com.facebook.presto.sql.relational.CallExpression;
 import com.facebook.presto.sql.relational.LambdaDefinitionExpression;
 import com.facebook.presto.sql.relational.RowExpression;
 import com.facebook.presto.sql.relational.RowExpressionVisitor;
-import com.google.common.base.Throwables;
 import com.google.common.base.VerifyException;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -157,9 +156,6 @@ public class JoinFilterFunctionCompiler
 
         body.append(thisVariable.setField(sessionField, sessionParameter));
         cachedInstanceBinder.generateInitializations(thisVariable, body);
-        for (CompiledLambda compiledLambda : preGeneratedExpressions.getCompiledLambdaMap().values()) {
-            compiledLambda.generateInitialization(thisVariable, body);
-        }
         body.ret();
     }
 
@@ -347,7 +343,7 @@ public class JoinFilterFunctionCompiler
                 isolatedJoinFilterFunctionConstructor = isolatedJoinFilterFunction.getConstructor(InternalJoinFilterFunction.class, LongArrayList.class, List.class);
             }
             catch (NoSuchMethodException e) {
-                throw Throwables.propagate(e);
+                throw new RuntimeException(e);
             }
         }
 
@@ -359,7 +355,7 @@ public class JoinFilterFunctionCompiler
                 return isolatedJoinFilterFunctionConstructor.newInstance(internalJoinFilterFunction, addresses, channels);
             }
             catch (ReflectiveOperationException e) {
-                throw Throwables.propagate(e);
+                throw new RuntimeException(e);
             }
         }
     }

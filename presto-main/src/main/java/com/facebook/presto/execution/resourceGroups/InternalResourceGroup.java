@@ -15,6 +15,7 @@ package com.facebook.presto.execution.resourceGroups;
 
 import com.facebook.presto.execution.QueryExecution;
 import com.facebook.presto.execution.QueryState;
+import com.facebook.presto.execution.resourceGroups.WeightedFairQueue.Usage;
 import com.facebook.presto.server.QueryStateInfo;
 import com.facebook.presto.server.ResourceGroupStateInfo;
 import com.facebook.presto.spi.PrestoException;
@@ -52,6 +53,7 @@ import static com.facebook.presto.spi.resourceGroups.ResourceGroupState.FULL;
 import static com.facebook.presto.spi.resourceGroups.SchedulingPolicy.FAIR;
 import static com.facebook.presto.spi.resourceGroups.SchedulingPolicy.QUERY_PRIORITY;
 import static com.facebook.presto.spi.resourceGroups.SchedulingPolicy.WEIGHTED;
+import static com.facebook.presto.spi.resourceGroups.SchedulingPolicy.WEIGHTED_FAIR;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -84,7 +86,7 @@ public class InternalResourceGroup
     // Sub groups with queued queries, that have capacity to run them
     // That is, they must return true when internalStartNext() is called on them
     @GuardedBy("root")
-    private UpdateablePriorityQueue<InternalResourceGroup> eligibleSubGroups = new FifoQueue<>();
+    private Queue<InternalResourceGroup> eligibleSubGroups = new FifoQueue<>();
     // Sub groups whose memory usage may be out of date. Most likely because they have a running query.
     @GuardedBy("root")
     private final Set<InternalResourceGroup> dirtySubGroups = new HashSet<>();
@@ -290,7 +292,7 @@ public class InternalResourceGroup
             boolean oldCanRun = canRunMore();
             this.softMemoryLimitBytes = limit.toBytes();
             if (canRunMore() != oldCanRun) {
-                updateEligiblility();
+                updateEligibility();
             }
         }
     }
@@ -313,7 +315,7 @@ public class InternalResourceGroup
             boolean oldCanRun = canRunMore();
             this.softCpuLimitMillis = limit.toMillis();
             if (canRunMore() != oldCanRun) {
-                updateEligiblility();
+                updateEligibility();
             }
         }
     }
@@ -336,7 +338,7 @@ public class InternalResourceGroup
             boolean oldCanRun = canRunMore();
             this.hardCpuLimitMillis = limit.toMillis();
             if (canRunMore() != oldCanRun) {
-                updateEligiblility();
+                updateEligibility();
             }
         }
     }
@@ -374,7 +376,7 @@ public class InternalResourceGroup
             boolean oldCanRun = canRunMore();
             this.softConcurrencyLimit = softConcurrencyLimit;
             if (canRunMore() != oldCanRun) {
-                updateEligiblility();
+                updateEligibility();
             }
         }
     }
@@ -397,7 +399,7 @@ public class InternalResourceGroup
             boolean oldCanRun = canRunMore();
             this.hardConcurrencyLimit = hardConcurrencyLimit;
             if (canRunMore() != oldCanRun) {
-                updateEligiblility();
+                updateEligibility();
             }
         }
     }
@@ -436,7 +438,7 @@ public class InternalResourceGroup
         synchronized (root) {
             this.schedulingWeight = weight;
             if (parent.isPresent() && parent.get().schedulingPolicy == WEIGHTED && parent.get().eligibleSubGroups.contains(this)) {
-                parent.get().eligibleSubGroups.addOrUpdate(this, computeSchedulingWeight());
+                parent.get().addOrUpdateSubGroup(this);
             }
         }
     }
@@ -462,7 +464,7 @@ public class InternalResourceGroup
             }
 
             // Switch to the appropriate queue implementation to implement the desired policy
-            UpdateablePriorityQueue<InternalResourceGroup> queue;
+            Queue<InternalResourceGroup> queue;
             UpdateablePriorityQueue<QueryExecution> queryQueue;
             switch (policy) {
                 case FAIR:
@@ -472,6 +474,10 @@ public class InternalResourceGroup
                 case WEIGHTED:
                     queue = new StochasticPriorityQueue<>();
                     queryQueue = new StochasticPriorityQueue<>();
+                    break;
+                case WEIGHTED_FAIR:
+                    queue = new WeightedFairQueue<>();
+                    queryQueue = new IndexedPriorityQueue<>();
                     break;
                 case QUERY_PRIORITY:
                     // Sub groups must use query priority to ensure ordering
@@ -486,7 +492,7 @@ public class InternalResourceGroup
             }
             while (!eligibleSubGroups.isEmpty()) {
                 InternalResourceGroup group = eligibleSubGroups.poll();
-                queue.addOrUpdate(group, getSubGroupSchedulingPriority(policy, group));
+                addOrUpdateSubGroup(group);
             }
             eligibleSubGroups = queue;
             while (!queuedQueries.isEmpty()) {
@@ -613,12 +619,12 @@ public class InternalResourceGroup
                 group.parent.get().descendantQueuedQueries++;
                 group = group.parent.get();
             }
-            updateEligiblility();
+            updateEligibility();
         }
     }
 
     // This method must be called whenever the group's eligibility to run more queries may have changed.
-    private void updateEligiblility()
+    private void updateEligibility()
     {
         checkState(Thread.holdsLock(root), "Must hold lock to update eligibility");
         synchronized (root) {
@@ -626,12 +632,12 @@ public class InternalResourceGroup
                 return;
             }
             if (isEligibleToStartNext()) {
-                parent.get().eligibleSubGroups.addOrUpdate(this, getSubGroupSchedulingPriority(parent.get().schedulingPolicy, this));
+                parent.get().addOrUpdateSubGroup(this);
             }
             else {
                 parent.get().eligibleSubGroups.remove(this);
             }
-            parent.get().updateEligiblility();
+            parent.get().updateEligibility();
         }
     }
 
@@ -646,7 +652,7 @@ public class InternalResourceGroup
                 group.parent.get().dirtySubGroups.add(group);
                 group = group.parent.get();
             }
-            updateEligiblility();
+            updateEligibility();
             executor.execute(query::start);
         }
     }
@@ -687,7 +693,7 @@ public class InternalResourceGroup
                     group = group.parent.get();
                 }
             }
-            updateEligiblility();
+            updateEligibility();
         }
     }
 
@@ -713,7 +719,7 @@ public class InternalResourceGroup
                         iterator.remove();
                     }
                     if (oldMemoryUsageBytes != subGroup.cachedMemoryUsageBytes) {
-                        subGroup.updateEligiblility();
+                        subGroup.updateEligibility();
                     }
                 }
             }
@@ -767,7 +773,7 @@ public class InternalResourceGroup
             descendantQueuedQueries--;
             // Don't call updateEligibility here, as we're in a recursive call, and don't want to repeatedly update our ancestors.
             if (subGroup.isEligibleToStartNext()) {
-                eligibleSubGroups.addOrUpdate(subGroup, getSubGroupSchedulingPriority(schedulingPolicy, subGroup));
+                addOrUpdateSubGroup(subGroup);
             }
             return true;
         }
@@ -792,6 +798,16 @@ public class InternalResourceGroup
                     query.fail(new PrestoException(EXCEEDED_TIME_LIMIT, "query exceeded resource group queued time limit"));
                 }
             }
+        }
+    }
+
+    private void addOrUpdateSubGroup(InternalResourceGroup group)
+    {
+        if (schedulingPolicy == WEIGHTED_FAIR) {
+            ((WeightedFairQueue<InternalResourceGroup>) eligibleSubGroups).addOrUpdate(group, new Usage(group.getSchedulingWeight(), group.getRunningQueries()));
+        }
+        else {
+            ((UpdateablePriorityQueue<InternalResourceGroup>) eligibleSubGroups).addOrUpdate(group, getSubGroupSchedulingPriority(schedulingPolicy, group));
         }
     }
 
