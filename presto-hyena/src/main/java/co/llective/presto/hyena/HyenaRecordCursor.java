@@ -55,7 +55,7 @@ public class HyenaRecordCursor
     private HyenaApi.HyenaOpMetadata hyenaOpMetadata;
 
     private List<String> fields;
-    private int foobar = 0;
+    private int foobar;
 
     private final HyenaApi.ScanResult result;
     private int rowPosition;
