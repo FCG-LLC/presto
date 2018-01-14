@@ -15,6 +15,7 @@ package com.facebook.presto.hive;
 
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorTableLayoutHandle;
+import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -22,7 +23,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
@@ -30,7 +30,7 @@ import static java.util.Objects.requireNonNull;
 public final class HiveTableLayoutHandle
         implements ConnectorTableLayoutHandle
 {
-    private final String clientId;
+    private final SchemaTableName schemaTableName;
     private final List<ColumnHandle> partitionColumns;
     private final List<HivePartition> partitions;
     private final TupleDomain<? extends ColumnHandle> compactEffectivePredicate;
@@ -39,13 +39,13 @@ public final class HiveTableLayoutHandle
 
     @JsonCreator
     public HiveTableLayoutHandle(
-            @JsonProperty("clientId") String clientId,
+            @JsonProperty("schemaTableName") SchemaTableName schemaTableName,
             @JsonProperty("partitionColumns") List<ColumnHandle> partitionColumns,
             @JsonProperty("compactEffectivePredicate") TupleDomain<ColumnHandle> compactEffectivePredicate,
             @JsonProperty("promisedPredicate") TupleDomain<ColumnHandle> promisedPredicate,
             @JsonProperty("bucketHandle") Optional<HiveBucketHandle> bucketHandle)
     {
-        this.clientId = requireNonNull(clientId, "clientId is null");
+        this.schemaTableName = requireNonNull(schemaTableName, "table is null");
         this.partitionColumns = ImmutableList.copyOf(requireNonNull(partitionColumns, "partitionColumns is null"));
         this.compactEffectivePredicate = requireNonNull(compactEffectivePredicate, "compactEffectivePredicate is null");
         this.partitions = null;
@@ -54,14 +54,14 @@ public final class HiveTableLayoutHandle
     }
 
     public HiveTableLayoutHandle(
-            String clientId,
+            SchemaTableName schemaTableName,
             List<ColumnHandle> partitionColumns,
             List<HivePartition> partitions,
             TupleDomain<? extends ColumnHandle> compactEffectivePredicate,
             TupleDomain<ColumnHandle> promisedPredicate,
             Optional<HiveBucketHandle> bucketHandle)
     {
-        this.clientId = requireNonNull(clientId, "clientId is null");
+        this.schemaTableName = requireNonNull(schemaTableName, "table is null");
         this.partitionColumns = ImmutableList.copyOf(requireNonNull(partitionColumns, "partitionColumns is null"));
         this.partitions = requireNonNull(partitions, "partitions is null");
         this.compactEffectivePredicate = requireNonNull(compactEffectivePredicate, "compactEffectivePredicate is null");
@@ -70,9 +70,9 @@ public final class HiveTableLayoutHandle
     }
 
     @JsonProperty
-    public String getClientId()
+    public SchemaTableName getSchemaTableName()
     {
-        return clientId;
+        return schemaTableName;
     }
 
     @JsonProperty
@@ -84,7 +84,7 @@ public final class HiveTableLayoutHandle
     /**
      * Partitions are dropped when HiveTableLayoutHandle is serialized.
      *
-     * @return list of partitions if avaiable, Optional.empty() if dropped
+     * @return list of partitions if available, {@code Optional.empty()} if dropped
      */
     @JsonIgnore
     public Optional<List<HivePartition>> getPartitions()
@@ -111,29 +111,8 @@ public final class HiveTableLayoutHandle
     }
 
     @Override
-    public boolean equals(Object o)
-    {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        HiveTableLayoutHandle that = (HiveTableLayoutHandle) o;
-        return Objects.equals(clientId, that.clientId) &&
-                Objects.equals(partitionColumns, that.partitionColumns) &&
-                Objects.equals(partitions, that.partitions);
-    }
-
-    @Override
-    public int hashCode()
-    {
-        return Objects.hash(clientId, partitionColumns, partitions);
-    }
-
-    @Override
     public String toString()
     {
-        return clientId.toString();
+        return schemaTableName.toString();
     }
 }

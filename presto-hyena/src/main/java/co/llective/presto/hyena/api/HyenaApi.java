@@ -81,9 +81,9 @@ public class HyenaApi
     public static class ScanFilterBuilder
     {
         private ScanFilter filter = new ScanFilter();
-        private boolean columnSet = false;
-        private boolean opSet = false;
-        private boolean filterValSet = false;
+        private boolean columnSet;
+        private boolean opSet;
+        private boolean filterValSet;
 
         public ScanFilterBuilder()
         {
@@ -151,6 +151,7 @@ public class HyenaApi
         public List<T> data = new ArrayList<>();
 
         public DenseBlock() {}
+
         public DenseBlock(int size)
         {
             this.data = new ArrayList<>(size);
@@ -168,9 +169,10 @@ public class HyenaApi
         public List<Long> valueStartPositions = new ArrayList<>();
         public byte[] bytes;
 
-        private int currentPosition = 0;
+        private int currentPosition;
 
         public StringBlock() {}
+
         public StringBlock(int size)
         {
             offsetData = new ArrayList<>(size);
@@ -207,7 +209,7 @@ public class HyenaApi
         public List<Integer> offsetData = new ArrayList<>();
         public List<T> valueData = new ArrayList<>();
 
-        private int currentPosition = 0;
+        private int currentPosition;
 
         public SparseBlock() {}
 
@@ -245,7 +247,7 @@ public class HyenaApi
         public String toString()
         {
             int count = 0;
-            switch(type) {
+            switch (type) {
                 case Int8Sparse:
                     count = int8SparseBlock.offsetData.size();
                     break;
@@ -269,13 +271,14 @@ public class HyenaApi
             return String.format("%s with %d elements", type.name(), count);
         }
 
-        public static BlockHolder decode(ByteBuffer buf) throws IOException
+        public static BlockHolder decode(ByteBuffer buf)
+                throws IOException
         {
             BlockHolder holder = new BlockHolder();
             holder.type = BlockType.values()[buf.getInt()];
             int recordsCount = (int) buf.getLong();
 
-            switch(holder.type) {
+            switch (holder.type) {
                 case Int8Sparse:
                     holder.int8SparseBlock = new SparseBlock<>(recordsCount);
                     break;
@@ -297,7 +300,7 @@ public class HyenaApi
             }
 
             for (int i = 0; i < recordsCount; i++) {
-                switch(holder.type) {
+                switch (holder.type) {
                     case Int8Sparse:
                         holder.int8SparseBlock.offsetData.add(buf.getInt());
                         holder.int8SparseBlock.valueData.add(buf.get());
@@ -358,7 +361,8 @@ public class HyenaApi
             this.blocks = blocks;
         }
 
-        private static List<Pair<Integer, BlockType>> decodeColumnTypes(ByteBuffer buf) throws IOException
+        private static List<Pair<Integer, BlockType>> decodeColumnTypes(ByteBuffer buf)
+                throws IOException
         {
             long colCount = buf.getLong();
             List<Pair<Integer, BlockType>> colTypes = new ArrayList<>();
@@ -370,7 +374,8 @@ public class HyenaApi
             return colTypes;
         }
 
-        private static List<BlockHolder> decodeBlocks(ByteBuffer buf) throws IOException
+        private static List<BlockHolder> decodeBlocks(ByteBuffer buf)
+                throws IOException
         {
             long count = buf.getLong();
             List<BlockHolder> blocks = new ArrayList<>();
@@ -380,7 +385,8 @@ public class HyenaApi
             return blocks;
         }
 
-        public static ScanResult decode(ByteBuffer buf) throws IOException
+        public static ScanResult decode(ByteBuffer buf)
+                throws IOException
         {
             int rowCount = buf.getInt();
             int colCount = buf.getInt();
@@ -468,7 +474,7 @@ public class HyenaApi
         }
     }
 
-    private boolean connected = false;
+    private boolean connected;
 
     private synchronized void ensureConnected()
     {
@@ -477,7 +483,8 @@ public class HyenaApi
         }
     }
 
-    public void connect(String url) throws IOException
+    public void connect(String url)
+            throws IOException
     {
         log.info("Opening new connection to: " + url);
         s.setRecvTimeout(60000);
@@ -497,7 +504,8 @@ public class HyenaApi
         public int bytes;
     }
 
-    public ScanResult scan(ScanRequest req, HyenaOpMetadata metaOrNull) throws IOException
+    public ScanResult scan(ScanRequest req, HyenaOpMetadata metaOrNull)
+            throws IOException
     {
         ensureConnected();
 
@@ -523,7 +531,8 @@ public class HyenaApi
         }
     }
 
-    public Catalog refreshCatalog() throws IOException
+    public Catalog refreshCatalog()
+            throws IOException
     {
         ensureConnected();
 
@@ -534,7 +543,8 @@ public class HyenaApi
         return decodeRefreshCatalog(buf);
     }
 
-    byte[] buildRefreshCatalogMessage() throws IOException
+    byte[] buildRefreshCatalogMessage()
+            throws IOException
     {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(baos);
@@ -545,7 +555,8 @@ public class HyenaApi
         return baos.toByteArray();
     }
 
-    byte[] buildScanMessage(ScanRequest req) throws IOException
+    byte[] buildScanMessage(ScanRequest req)
+            throws IOException
     {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(baos);
@@ -559,7 +570,8 @@ public class HyenaApi
         return baos.toByteArray();
     }
 
-    byte[] encodeScanRequest(ScanRequest req) throws IOException
+    byte[] encodeScanRequest(ScanRequest req)
+            throws IOException
     {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(baos);
@@ -586,7 +598,8 @@ public class HyenaApi
         return baos.toByteArray();
     }
 
-    byte[] encodeScanFilter(ScanFilter filter) throws IOException
+    byte[] encodeScanFilter(ScanFilter filter)
+            throws IOException
     {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(baos);
@@ -599,7 +612,8 @@ public class HyenaApi
         return baos.toByteArray();
     }
 
-    Catalog decodeRefreshCatalog(ByteBuffer buf) throws IOException
+    Catalog decodeRefreshCatalog(ByteBuffer buf)
+            throws IOException
     {
         long columnCount = buf.getLong();
         List<Column> columns = new ArrayList<>();
@@ -616,19 +630,22 @@ public class HyenaApi
         return new Catalog(columns, partitions);
     }
 
-    PartitionInfo decodePartitionInfo(ByteBuffer buf) throws IOException
+    PartitionInfo decodePartitionInfo(ByteBuffer buf)
+            throws IOException
     {
         return new PartitionInfo(buf.getLong(), buf.getLong(), buf.getLong(), decodeStringArray(buf));
     }
 
-    Column decodeColumn(ByteBuffer buf) throws IOException
+    Column decodeColumn(ByteBuffer buf)
+            throws IOException
     {
         return new Column(
                 BlockType.values()[buf.getInt()],
                 decodeStringArray(buf));
     }
 
-    byte[] encodeStringArray(String str) throws IOException
+    byte[] encodeStringArray(String str)
+            throws IOException
     {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(baos);
@@ -640,7 +657,8 @@ public class HyenaApi
         return baos.toByteArray();
     }
 
-    String decodeStringArray(ByteBuffer buf) throws IOException
+    String decodeStringArray(ByteBuffer buf)
+            throws IOException
     {
         int len = (int) buf.getLong();
 
@@ -649,7 +667,8 @@ public class HyenaApi
         return new String(bytes, UTF8_CHARSET);
     }
 
-    byte[] encodeByteArray(byte[] values) throws IOException
+    byte[] encodeByteArray(byte[] values)
+            throws IOException
     {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(baos);

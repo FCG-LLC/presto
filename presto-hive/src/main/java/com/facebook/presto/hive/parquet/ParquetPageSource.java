@@ -26,18 +26,19 @@ import com.facebook.presto.spi.block.RunLengthEncodedBlock;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import parquet.column.ColumnDescriptor;
 import parquet.schema.MessageType;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.REGULAR;
+import static com.facebook.presto.hive.HiveErrorCode.HIVE_BAD_DATA;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_CURSOR_ERROR;
 import static com.facebook.presto.hive.parquet.ParquetTypeUtils.getDescriptor;
 import static com.facebook.presto.hive.parquet.ParquetTypeUtils.getFieldIndex;
@@ -209,6 +210,10 @@ public class ParquetPageSource
             closeWithSuppression(e);
             throw e;
         }
+        catch (ParquetCorruptionException e) {
+            closeWithSuppression(e);
+            throw new PrestoException(HIVE_BAD_DATA, e);
+        }
         catch (IOException | RuntimeException e) {
             closeWithSuppression(e);
             throw new PrestoException(HIVE_CURSOR_ERROR, e);
@@ -241,7 +246,7 @@ public class ParquetPageSource
             parquetReader.close();
         }
         catch (IOException e) {
-            throw Throwables.propagate(e);
+            throw new UncheckedIOException(e);
         }
     }
 
@@ -271,6 +276,9 @@ public class ParquetPageSource
             try {
                 Block block = parquetReader.readPrimitive(columnDescriptor, type);
                 lazyBlock.setBlock(block);
+            }
+            catch (ParquetCorruptionException e) {
+                throw new PrestoException(HIVE_BAD_DATA, e);
             }
             catch (IOException e) {
                 throw new PrestoException(HIVE_CURSOR_ERROR, e);

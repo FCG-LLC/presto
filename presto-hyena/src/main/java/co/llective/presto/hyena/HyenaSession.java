@@ -23,7 +23,9 @@ public interface HyenaSession
     NativeHyenaSession recordSetProviderSession();
 
     List<HyenaApi.PartitionInfo> getAvailablePartitions();
+
     List<HyenaApi.Column> getAvailableColumns();
+
     HyenaApi.ScanResult scan(HyenaApi.ScanRequest req, HyenaApi.HyenaOpMetadata metadataOrNull);
 
     void close();
