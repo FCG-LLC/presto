@@ -22,12 +22,13 @@ import com.google.common.util.concurrent.ListenableFuture;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 public interface QueryManager
 {
     List<QueryInfo> getAllQueryInfo();
 
-    ListenableFuture<QueryOutputInfo> getOutputInfo(QueryId queryId);
+    void addOutputInfoListener(QueryId queryId, Consumer<QueryOutputInfo> listener);
 
     ListenableFuture<QueryState> getStateChange(QueryId queryId, QueryState currentState);
 
@@ -42,6 +43,8 @@ public interface QueryManager
     void recordHeartbeat(QueryId queryId);
 
     QueryInfo createQuery(SessionContext sessionContext, String query);
+
+    void failQuery(QueryId queryId, Throwable cause);
 
     void cancelQuery(QueryId queryId);
 

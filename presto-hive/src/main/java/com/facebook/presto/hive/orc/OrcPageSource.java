@@ -29,10 +29,10 @@ import com.facebook.presto.spi.block.LazyBlock;
 import com.facebook.presto.spi.block.LazyBlockLoader;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.REGULAR;
@@ -154,6 +154,10 @@ public class OrcPageSource
             closeWithSuppression(e);
             throw e;
         }
+        catch (OrcCorruptionException e) {
+            closeWithSuppression(e);
+            throw new PrestoException(HIVE_BAD_DATA, e);
+        }
         catch (IOException | RuntimeException e) {
             closeWithSuppression(e);
             throw new PrestoException(HIVE_CURSOR_ERROR, e);
@@ -174,7 +178,7 @@ public class OrcPageSource
             recordReader.close();
         }
         catch (IOException e) {
-            throw Throwables.propagate(e);
+            throw new UncheckedIOException(e);
         }
     }
 
@@ -234,10 +238,10 @@ public class OrcPageSource
                 Block block = recordReader.readBlock(type, columnIndex);
                 lazyBlock.setBlock(block);
             }
+            catch (OrcCorruptionException e) {
+                throw new PrestoException(HIVE_BAD_DATA, e);
+            }
             catch (IOException e) {
-                if (e instanceof OrcCorruptionException) {
-                    throw new PrestoException(HIVE_BAD_DATA, e);
-                }
                 throw new PrestoException(HIVE_CURSOR_ERROR, e);
             }
 

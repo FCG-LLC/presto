@@ -58,6 +58,7 @@ import java.util.stream.Collectors;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_FILESYSTEM_ERROR;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_METASTORE_ERROR;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_PATH_ALREADY_EXISTS;
+import static com.facebook.presto.hive.HiveErrorCode.HIVE_TABLE_DROPPED_DURING_QUERY;
 import static com.facebook.presto.hive.HiveMetadata.PRESTO_QUERY_ID_NAME;
 import static com.facebook.presto.hive.HiveUtil.toPartitionValues;
 import static com.facebook.presto.hive.HiveWriteUtils.createDirectory;
@@ -95,7 +96,7 @@ public class SemiTransactionalHiveMetastore
     private ExclusiveOperation bufferedExclusiveOperation;
     @GuardedBy("this")
     private State state = State.EMPTY;
-    private boolean throwOnCleanupFailure = false;
+    private boolean throwOnCleanupFailure;
 
     public SemiTransactionalHiveMetastore(HdfsEnvironment hdfsEnvironment, ExtendedHiveMetastore delegate, Executor renameExecutor, boolean skipDeletionForAlter)
     {
@@ -2074,8 +2075,9 @@ public class SemiTransactionalHiveMetastore
                     Optional<Table> existingTable = metastore.getTable(newTable.getDatabaseName(), newTable.getTableName());
                     if (existingTable.isPresent()) {
                         Table table = existingTable.get();
-                        if (getPrestoQueryId(table).equals(queryId)) {
-                            // ignore table if it was already created by us due to retry
+                        Optional<String> existingTableQueryId = getPrestoQueryId(table);
+                        if (existingTableQueryId.isPresent() && existingTableQueryId.get().equals(queryId)) {
+                            // ignore table if it was already created by the same query during retries
                             done = true;
                         }
                         else {
@@ -2240,6 +2242,9 @@ public class SemiTransactionalHiveMetastore
                     // For some reason, it threw an exception (communication failure, retry failure after communication failure, etc).
                     // But we would consider it successful anyways.
                     if (!batchCompletelyAdded) {
+                        if (t instanceof TableNotFoundException) {
+                            throw new PrestoException(HIVE_TABLE_DROPPED_DURING_QUERY, t);
+                        }
                         throw t;
                     }
                 }

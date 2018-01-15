@@ -69,7 +69,6 @@ public class HyenaRecordCursor
     private HyenaApi.HyenaOpMetadata hyenaOpMetadata;
 
     private List<String> fields;
-    private int foobar = 0;
 
     private final ScanResult result;
     private int rowPosition;
@@ -191,8 +190,8 @@ public class HyenaRecordCursor
             return 0;
         }
         return result.getData().get(0).getData()
-            .map(bh -> bh.getBlock().count())
-            .orElse(0);
+                .map(bh -> bh.getBlock().count())
+                .orElse(0);
     }
 
     private void preparePredicates(TupleDomain<HyenaColumnHandle> predicate)

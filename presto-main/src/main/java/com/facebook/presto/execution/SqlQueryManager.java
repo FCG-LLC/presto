@@ -68,6 +68,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import static com.facebook.presto.execution.ParameterExtractor.getParameterCount;
 import static com.facebook.presto.execution.QueryState.RUNNING;
@@ -78,6 +79,7 @@ import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.StandardErrorCode.QUERY_TEXT_TOO_LARGE;
 import static com.facebook.presto.spi.StandardErrorCode.SERVER_SHUTTING_DOWN;
 import static com.facebook.presto.spi.StandardErrorCode.SERVER_STARTING_UP;
+import static com.facebook.presto.sql.ParsingUtil.createParsingOptions;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.INVALID_PARAMETER_USAGE;
 import static com.facebook.presto.sql.planner.ExpressionInterpreter.verifyExpressionIsConstant;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -209,7 +211,7 @@ public class SqlQueryManager
                 }
 
                 try {
-                    enforeTimeLimits();
+                    enforceTimeLimits();
                 }
                 catch (Throwable e) {
                     log.warn(e, "Error enforcing query timeout limits");
@@ -274,16 +276,17 @@ public class SqlQueryManager
     }
 
     @Override
-    public ListenableFuture<QueryOutputInfo> getOutputInfo(QueryId queryId)
+    public void addOutputInfoListener(QueryId queryId, Consumer<QueryOutputInfo> listener)
     {
         requireNonNull(queryId, "queryId is null");
+        requireNonNull(listener, "listener is null");
 
         QueryExecution query = queries.get(queryId);
         if (query == null) {
-            return immediateFailedFuture(new NoSuchElementException());
+            throw new NoSuchElementException();
         }
 
-        return query.getOutputInfo();
+        query.addOutputInfoListener(listener);
     }
 
     @Override
@@ -392,8 +395,7 @@ public class SqlQueryManager
                 query = query.substring(0, maxQueryLength);
                 throw new PrestoException(QUERY_TEXT_TOO_LARGE, format("Query text length (%s) exceeds the maximum length (%s)", queryLength, maxQueryLength));
             }
-
-            Statement wrappedStatement = sqlParser.createStatement(query);
+            Statement wrappedStatement = sqlParser.createStatement(query, createParsingOptions(session));
             statement = unwrapExecuteStatement(wrappedStatement, sqlParser, session);
             List<Expression> parameters = wrappedStatement instanceof Execute ? ((Execute) wrappedStatement).getParameters() : emptyList();
             validateParameters(statement, parameters);
@@ -478,7 +480,7 @@ public class SqlQueryManager
         }
 
         String sql = session.getPreparedStatementFromExecute((Execute) statement);
-        return sqlParser.createStatement(sql);
+        return sqlParser.createStatement(sql, createParsingOptions(session));
     }
 
     public static void validateParameters(Statement node, List<Expression> parameterValues)
@@ -489,6 +491,18 @@ public class SqlQueryManager
         }
         for (Expression expression : parameterValues) {
             verifyExpressionIsConstant(emptySet(), expression);
+        }
+    }
+
+    @Override
+    public void failQuery(QueryId queryId, Throwable cause)
+    {
+        requireNonNull(queryId, "queryId is null");
+        requireNonNull(cause, "cause is null");
+
+        QueryExecution query = queries.get(queryId);
+        if (query != null) {
+            query.fail(cause);
         }
     }
 
@@ -553,7 +567,7 @@ public class SqlQueryManager
     /**
      * Enforce query max runtime/execution time limits
      */
-    public void enforeTimeLimits()
+    public void enforceTimeLimits()
     {
         for (QueryExecution query : queries.values()) {
             if (query.getState().isDone()) {
@@ -622,14 +636,19 @@ public class SqlQueryManager
     public void failAbandonedQueries()
     {
         for (QueryExecution queryExecution : queries.values()) {
-            QueryInfo queryInfo = queryExecution.getQueryInfo();
-            if (queryInfo.getState().isDone()) {
-                continue;
-            }
+            try {
+                QueryInfo queryInfo = queryExecution.getQueryInfo();
+                if (queryInfo.getState().isDone()) {
+                    continue;
+                }
 
-            if (isAbandoned(queryInfo)) {
-                log.info("Failing abandoned query %s", queryExecution.getQueryId());
-                queryExecution.fail(new PrestoException(ABANDONED_QUERY, format("Query %s has not been accessed since %s: currentTime %s", queryInfo.getQueryId(), queryInfo.getQueryStats().getLastHeartbeat(), DateTime.now())));
+                if (isAbandoned(queryInfo)) {
+                    log.info("Failing abandoned query %s", queryExecution.getQueryId());
+                    queryExecution.fail(new PrestoException(ABANDONED_QUERY, format("Query %s has not been accessed since %s: currentTime %s", queryInfo.getQueryId(), queryInfo.getQueryStats().getLastHeartbeat(), DateTime.now())));
+                }
+            }
+            catch (RuntimeException e) {
+                log.error(e, "Exception failing abandoned query %s", queryExecution.getQueryId());
             }
         }
     }

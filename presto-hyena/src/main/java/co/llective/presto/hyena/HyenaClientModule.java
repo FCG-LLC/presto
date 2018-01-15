@@ -19,6 +19,7 @@ import com.google.inject.Provides;
 import com.google.inject.Scopes;
 
 import javax.inject.Singleton;
+
 import static io.airlift.configuration.ConfigBinder.configBinder;
 
 public class HyenaClientModule
