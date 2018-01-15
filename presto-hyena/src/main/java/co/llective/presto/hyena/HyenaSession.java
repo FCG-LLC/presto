@@ -13,7 +13,12 @@
  */
 package co.llective.presto.hyena;
 
-import co.llective.presto.hyena.api.HyenaApi;
+import co.llective.hyena.api.Catalog;
+import co.llective.hyena.api.Column;
+import co.llective.hyena.api.HyenaApi;
+import co.llective.hyena.api.PartitionInfo;
+import co.llective.hyena.api.ScanRequest;
+import co.llective.hyena.api.ScanResult;
 
 import java.util.List;
 
@@ -22,9 +27,10 @@ public interface HyenaSession
     // We need to create new session since Nanomsg connections are not thread safe...
     NativeHyenaSession recordSetProviderSession();
 
-    List<HyenaApi.PartitionInfo> getAvailablePartitions();
-    List<HyenaApi.Column> getAvailableColumns();
-    HyenaApi.ScanResult scan(HyenaApi.ScanRequest req, HyenaApi.HyenaOpMetadata metadataOrNull);
+    List<PartitionInfo> getAvailablePartitions();
+    List<Column> getAvailableColumns();
+    Catalog refreshCatalog();
+    ScanResult scan(ScanRequest req, HyenaApi.HyenaOpMetadata metadataOrNull);
 
     void close();
 }

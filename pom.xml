@@ -1140,6 +1140,19 @@
                                 </pluginExecution>
                                 <pluginExecution>
                                     <pluginExecutionFilter>
+                                        <groupId>org.apache.maven.plugins</groupId>
+                                        <artifactId>project-info-reports</artifactId>
+                                        <versionRange>[2.0,)</versionRange>
+                                        <goals>
+                                            <goal>license</goal>
+                                        </goals>
+                                    </pluginExecutionFilter>
+                                    <action>
+                                        <ignore />
+                                    </action>
+                                </pluginExecution>
+                                <pluginExecution>
+                                    <pluginExecutionFilter>
                                         <groupId>com.mycila</groupId>
                                         <artifactId>license-maven-plugin</artifactId>
                                         <versionRange>[2.3,)</versionRange>

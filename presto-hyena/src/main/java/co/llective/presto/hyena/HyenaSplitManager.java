@@ -13,7 +13,7 @@
  */
 package co.llective.presto.hyena;
 
-import co.llective.presto.hyena.api.HyenaApi;
+import co.llective.hyena.api.PartitionInfo;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.ConnectorSplitSource;
@@ -27,11 +27,11 @@ import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import io.airlift.log.Logger;
 import org.apache.commons.lang3.tuple.Pair;
 
 import javax.inject.Inject;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -98,7 +98,7 @@ public class HyenaSplitManager
                 allOrNone -> ImmutableList.of());
     }
 
-    public boolean prunePartitionOnTs(HyenaApi.PartitionInfo partitionInfo, List<Pair<Long, Long>> allowedTsRanges)
+    public boolean prunePartitionOnTs(PartitionInfo partitionInfo, List<Pair<Long, Long>> allowedTsRanges)
     {
         if (allowedTsRanges.isEmpty()) {
             // Allow anything it ts included in filters
@@ -109,13 +109,13 @@ public class HyenaSplitManager
             Long practicalLeft = range.getLeft() == null ? 0L : range.getLeft();
             Long practicalRight = range.getRight() == null ? Long.MAX_VALUE : range.getRight();
 
-            if (partitionInfo.minTs <= practicalRight && partitionInfo.maxTs >= practicalLeft) {
+            if (partitionInfo.getMinTs() <= practicalRight && partitionInfo.getMaxTs() >= practicalLeft) {
                 return false; // cannot prune, the range overlaps
             }
         }
 
         // Nothing matched
-        log.info("Pruned partition %d with TS range %d-%d", partitionInfo.id, partitionInfo.minTs, partitionInfo.maxTs);
+        log.info("Pruned partition %d with TS range %d-%d", partitionInfo.getId(), partitionInfo.getMinTs(), partitionInfo.getMaxTs());
         return true;
     }
 
@@ -128,7 +128,7 @@ public class HyenaSplitManager
         TupleDomain<HyenaColumnHandle> effectivePredicate = layoutHandle.getConstraint()
                 .transform(HyenaColumnHandle.class::cast);
 
-        List<HyenaApi.PartitionInfo> partitions = hyenaSession.getAvailablePartitions();
+        List<PartitionInfo> partitions = hyenaSession.getAvailablePartitions();
 
         // TODO: this works for single node only as of now
         // TODO: do partition pruning basing on other features (sources?)
@@ -146,7 +146,7 @@ public class HyenaSplitManager
         Node currentNode = nodeManager.getCurrentNode();
         List<ConnectorSplit> splits = partitions.stream()
                 .filter(partitionInfo -> !prunePartitionOnTs(partitionInfo, tsRanges))
-                .map(partition -> new HyenaSplit(currentNode.getHostAndPort(), partition.id, effectivePredicate))
+                .map(partition -> new HyenaSplit(currentNode.getHostAndPort(), Sets.newHashSet(partition.getId()), effectivePredicate))
                 .collect(Collectors.toList());
 
         return new FixedSplitSource(splits);

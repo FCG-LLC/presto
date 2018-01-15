@@ -22,6 +22,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 import static java.util.Objects.requireNonNull;
 
@@ -32,7 +34,7 @@ public class HyenaRecordSet
     private final List<Type> columnTypes;
     private final HostAddress address;
     private final TupleDomain<HyenaColumnHandle> effectivePredicate;
-    private final Long partitionId;
+    private final Set<UUID> partitionIds;
     private final HyenaSession hyenaSession;
 
     public HyenaRecordSet(HyenaSession hyenaSession, HyenaSplit split, List<HyenaColumnHandle> columns)
@@ -47,7 +49,7 @@ public class HyenaRecordSet
         this.columnTypes = types.build();
         this.address = Iterables.getOnlyElement(split.getAddresses());
         this.effectivePredicate = split.getEffectivePredicate();
-        this.partitionId = split.getPartitionId();
+        this.partitionIds = split.getPartitionIds();
 
         this.hyenaSession = requireNonNull(hyenaSession, "hyenaSession is null");
     }
@@ -61,6 +63,6 @@ public class HyenaRecordSet
     @Override
     public RecordCursor cursor()
     {
-        return new HyenaRecordCursor(hyenaSession, columns, address, partitionId, effectivePredicate);
+        return new HyenaRecordCursor(hyenaSession, columns, address, partitionIds, effectivePredicate);
     }
 }

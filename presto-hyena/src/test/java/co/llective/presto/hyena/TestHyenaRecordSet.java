@@ -17,9 +17,11 @@ import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.predicate.TupleDomain;
+import com.google.common.collect.Sets;
 import org.testng.annotations.Test;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static com.facebook.presto.testing.TestingConnectorSession.SESSION;
@@ -28,14 +30,14 @@ import static org.testng.Assert.assertTrue;
 
 public class TestHyenaRecordSet
 {
-    private static final HostAddress address = HostAddress.fromParts("localhost", 1234);
+    private static final HostAddress address = HostAddress.fromParts("localhost", 4433);
 
     @Test
     public void testSimpleCursor()
             throws Exception
     {
         HyenaConfig config = new HyenaConfig();
-        config.setHyenaHost("ipc:///tmp/hyena.ipc");
+        config.setHyenaHost("tcp://localhost:4433");
 
         HyenaTables hyenaTables = new HyenaTables(config);
         HyenaSession hyenaSession = new NativeHyenaSession(config);
@@ -51,7 +53,7 @@ public class TestHyenaRecordSet
                 .values().stream().map(column -> (HyenaColumnHandle) column)
                 .collect(Collectors.toList());
 
-        HyenaRecordSet recordSet = new HyenaRecordSet(hyenaSession, new HyenaSplit(address, 1775976771987511425L, TupleDomain.all()), columnHandles);
+        HyenaRecordSet recordSet = new HyenaRecordSet(hyenaSession, new HyenaSplit(address, Sets.newHashSet(UUID.randomUUID()), TupleDomain.all()), columnHandles);
         RecordCursor cursor = recordSet.cursor();
 
         for (int i = 0; i < columnHandles.size(); i++) {
