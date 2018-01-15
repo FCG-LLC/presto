@@ -28,8 +28,11 @@ public interface HyenaSession
     NativeHyenaSession recordSetProviderSession();
 
     List<PartitionInfo> getAvailablePartitions();
+
     List<Column> getAvailableColumns();
+
     Catalog refreshCatalog();
+
     ScanResult scan(ScanRequest req, HyenaApi.HyenaOpMetadata metadataOrNull);
 
     void close();
