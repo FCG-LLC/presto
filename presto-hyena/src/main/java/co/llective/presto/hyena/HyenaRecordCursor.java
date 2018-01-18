@@ -26,6 +26,7 @@ import co.llective.hyena.api.ScanRequest;
 import co.llective.hyena.api.ScanResult;
 import co.llective.hyena.api.SparseBlock;
 import co.llective.hyena.api.StringBlock;
+import co.llective.presto.hyena.types.U64Type;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.predicate.Domain;
@@ -238,7 +239,7 @@ public class HyenaRecordCursor
     @Override
     public long getLong(int field)
     {
-        checkFieldType(field, BIGINT, INTEGER);
+        checkFieldType(field, BIGINT, INTEGER, U64Type.U_64_TYPE);
 
         BlockHolder holder = getBlockHolderOrThrow(field);
         Block block = holder.getBlock();

@@ -12,14 +12,15 @@ import com.google.common.primitives.UnsignedLong;
 
 public class U64Type
 //        extends AbstractFixedWidthType
-      extends AbstractType
-      implements FixedWidthType
+        extends AbstractType
+        implements FixedWidthType
 {
     public static final U64Type U_64_TYPE = new U64Type();
+    public static final String U_64_NAME = "unsigned_long";
 
     private U64Type()
     {
-      super(TypeSignature.parseTypeSignature("unsigned_long"), long.class);
+        super(TypeSignature.parseTypeSignature(U_64_NAME), long.class);
     }
 
     @Override
@@ -34,17 +35,19 @@ public class U64Type
         return true;
     }
 
-  @Override
-  public BlockBuilder createBlockBuilder(BlockBuilderStatus blockBuilderStatus, int expectedEntries, int expectedBytesPerEntry) {
-    return null;
-  }
+    @Override
+    public BlockBuilder createBlockBuilder(BlockBuilderStatus blockBuilderStatus, int expectedEntries, int expectedBytesPerEntry)
+    {
+        return null;
+    }
 
-  @Override
-  public BlockBuilder createBlockBuilder(BlockBuilderStatus blockBuilderStatus, int expectedEntries) {
-    return null;
-  }
+    @Override
+    public BlockBuilder createBlockBuilder(BlockBuilderStatus blockBuilderStatus, int expectedEntries)
+    {
+        return null;
+    }
 
-  @Override
+    @Override
     public boolean equalTo(Block leftBlock, int leftPosition, Block rightBlock, int rightPosition)
     {
         return compareTo(leftBlock, leftPosition, rightBlock, rightPosition) == 0;
@@ -97,12 +100,14 @@ public class U64Type
     }
 
     @Override
-    public int getFixedSize() {
+    public int getFixedSize()
+    {
         return 8;
     }
 
     @Override
-    public BlockBuilder createFixedSizeBlockBuilder(int positionCount) {
+    public BlockBuilder createFixedSizeBlockBuilder(int positionCount)
+    {
         return new FixedWidthBlockBuilder(getFixedSize(), positionCount);
     }
 }
