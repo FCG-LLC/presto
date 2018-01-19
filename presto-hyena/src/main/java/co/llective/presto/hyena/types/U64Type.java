@@ -3,24 +3,19 @@ package co.llective.presto.hyena.types;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
-import com.facebook.presto.spi.block.BlockBuilderStatus;
-import com.facebook.presto.spi.block.FixedWidthBlockBuilder;
-import com.facebook.presto.spi.type.AbstractType;
-import com.facebook.presto.spi.type.FixedWidthType;
+import com.facebook.presto.spi.type.AbstractFixedWidthType;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.google.common.primitives.UnsignedLong;
 
 public class U64Type
-//        extends AbstractFixedWidthType
-        extends AbstractType
-        implements FixedWidthType
+        extends AbstractFixedWidthType
 {
     public static final U64Type U_64_TYPE = new U64Type();
     public static final String U_64_NAME = "unsigned_long";
 
     private U64Type()
     {
-        super(TypeSignature.parseTypeSignature(U_64_NAME), long.class);
+        super(TypeSignature.parseTypeSignature(U_64_NAME), long.class, 8);
     }
 
     @Override
@@ -36,18 +31,6 @@ public class U64Type
     }
 
     @Override
-    public BlockBuilder createBlockBuilder(BlockBuilderStatus blockBuilderStatus, int expectedEntries, int expectedBytesPerEntry)
-    {
-        return null;
-    }
-
-    @Override
-    public BlockBuilder createBlockBuilder(BlockBuilderStatus blockBuilderStatus, int expectedEntries)
-    {
-        return null;
-    }
-
-    @Override
     public boolean equalTo(Block leftBlock, int leftPosition, Block rightBlock, int rightPosition)
     {
         return compareTo(leftBlock, leftPosition, rightBlock, rightPosition) == 0;
@@ -58,6 +41,11 @@ public class U64Type
     {
         long leftValue = getLong(leftBlock, leftPosition);
         long rightValue = getLong(rightBlock, rightPosition);
+        return compareUnsignedLongs(leftValue, rightValue);
+    }
+
+    public static int compareUnsignedLongs(long leftValue, long rightValue)
+    {
         return UnsignedLong.fromLongBits(leftValue).compareTo(UnsignedLong.fromLongBits(rightValue));
     }
 
@@ -96,18 +84,9 @@ public class U64Type
     @Override
     public void writeLong(BlockBuilder blockBuilder, long value)
     {
-        blockBuilder.writeLong(value).closeEntry();
+        blockBuilder
+                .writeLong(value)
+                .closeEntry();
     }
 
-    @Override
-    public int getFixedSize()
-    {
-        return 8;
-    }
-
-    @Override
-    public BlockBuilder createFixedSizeBlockBuilder(int positionCount)
-    {
-        return new FixedWidthBlockBuilder(getFixedSize(), positionCount);
-    }
 }
