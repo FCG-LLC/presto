@@ -7,7 +7,7 @@ import com.facebook.presto.spi.type.AbstractFixedWidthType;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.google.common.primitives.UnsignedLong;
 
-public class U64Type
+public final class U64Type
         extends AbstractFixedWidthType
 {
     public static final U64Type U_64_TYPE = new U64Type();
@@ -44,7 +44,7 @@ public class U64Type
         return compareUnsignedLongs(leftValue, rightValue);
     }
 
-    public static int compareUnsignedLongs(long leftValue, long rightValue)
+    public int compareUnsignedLongs(long leftValue, long rightValue)
     {
         return UnsignedLong.fromLongBits(leftValue).compareTo(UnsignedLong.fromLongBits(rightValue));
     }
