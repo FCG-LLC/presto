@@ -13,6 +13,7 @@
  */
 package co.llective.presto.hyena;
 
+import co.llective.presto.hyena.types.U64BigIntOperators;
 import co.llective.presto.hyena.types.U64Operators;
 import co.llective.presto.hyena.types.U64Type;
 import com.facebook.presto.spi.Plugin;
@@ -44,6 +45,7 @@ public class HyenaPlugin
     {
         return ImmutableSet.<Class<?>>builder()
                 .add(U64Operators.class)
+                .add(U64BigIntOperators.class)
                 .build();
     }
 }

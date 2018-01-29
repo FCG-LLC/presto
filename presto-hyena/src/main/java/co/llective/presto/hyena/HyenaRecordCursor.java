@@ -36,6 +36,7 @@ import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.Type;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.primitives.UnsignedLong;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import org.apache.commons.lang3.StringUtils;
@@ -132,6 +133,16 @@ public class HyenaRecordCursor
                                         if (column.getColumnType() == VARCHAR) {
                                             builder = builder.withStringValue(((Slice) high.getValue()).toStringUtf8());
                                         }
+                                        else if (column.getColumnType() == U64Type.U_64_TYPE) {
+                                            //TODO: replace with proper handling of U64 filters
+                                            Long value = (Long) high.getValue();
+                                            if (value < 0) {
+                                                builder = builder.withOp(ScanComparison.Gt);
+                                                builder = builder.withValue(UnsignedLong.MAX_VALUE.longValue());
+                                            } else {
+                                                builder = builder.withValue(value);
+                                            }
+                                        }
                                         else {
                                             builder = builder.withValue((Long) high.getValue());
                                         }
@@ -156,6 +167,16 @@ public class HyenaRecordCursor
 
                                         if (column.getColumnType() == VARCHAR) {
                                             builder = builder.withStringValue(((Slice) low.getValue()).toStringUtf8());
+                                        }
+                                        else if (column.getColumnType() == U64Type.U_64_TYPE) {
+                                            //TODO: replace with proper handling of U64 filters
+                                            Long value = (Long) low.getValue();
+                                            if (value < 0) {
+                                                builder = builder.withOp(ScanComparison.GtEq);
+                                                builder = builder.withValue(UnsignedLong.ZERO.longValue());
+                                            } else {
+                                                builder = builder.withValue(value);
+                                            }
                                         }
                                         else {
                                             builder = builder.withValue((Long) low.getValue());

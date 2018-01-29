@@ -7,6 +7,7 @@ import com.facebook.presto.spi.type.AbstractLongType;
 import com.facebook.presto.spi.type.StandardTypes;
 
 import static co.llective.presto.hyena.types.U64Type.U_64_NAME;
+import static co.llective.presto.hyena.types.U64Type.U_64_TYPE;
 import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
 import static com.facebook.presto.spi.function.OperatorType.BETWEEN;
 import static com.facebook.presto.spi.function.OperatorType.CAST;
@@ -27,70 +28,50 @@ public final class U64Operators
     @SqlType(StandardTypes.BOOLEAN)
     public static boolean equal(@SqlType(U_64_NAME) long left, @SqlType(U_64_NAME) long right)
     {
-        return left == right;
+        return U_64_TYPE.compareUnsignedLongs(left, right) == 0;
     }
 
     @ScalarOperator(NOT_EQUAL)
     @SqlType(StandardTypes.BOOLEAN)
     public static boolean notEqual(@SqlType(U_64_NAME) long left, @SqlType(U_64_NAME) long right)
     {
-        return left != right;
+        return U_64_TYPE.compareUnsignedLongs(left, right) != 0;
     }
 
     @ScalarOperator(LESS_THAN)
     @SqlType(StandardTypes.BOOLEAN)
     public static boolean lessThan(@SqlType(U_64_NAME) long left, @SqlType(U_64_NAME) long right)
     {
-        return left < right;
-    }
-
-    @ScalarOperator(LESS_THAN)
-    @SqlType(StandardTypes.BOOLEAN)
-    public static boolean lessThanBigInt(@SqlType(U_64_NAME) long left, @SqlType(StandardTypes.BIGINT) long right)
-    {
-        return left < right;
-    }
-
-    @ScalarOperator(LESS_THAN_OR_EQUAL)
-    @SqlType(StandardTypes.BOOLEAN)
-    public static boolean lessThanOrEqualBigInt(@SqlType(U_64_NAME) long left, @SqlType(StandardTypes.BIGINT) long right)
-    {
-        return left <= right;
+        return U_64_TYPE.compareUnsignedLongs(left, right) < 0;
     }
 
     @ScalarOperator(LESS_THAN_OR_EQUAL)
     @SqlType(StandardTypes.BOOLEAN)
     public static boolean lessThanOrEqual(@SqlType(U_64_NAME) long left, @SqlType(U_64_NAME) long right)
     {
-        return left <= right;
+        return U_64_TYPE.compareUnsignedLongs(left, right) <= 0;
     }
 
     @ScalarOperator(GREATER_THAN)
     @SqlType(StandardTypes.BOOLEAN)
     public static boolean greaterThan(@SqlType(U_64_NAME) long left, @SqlType(U_64_NAME) long right)
     {
-        return left > right;
-    }
-
-    @ScalarOperator(GREATER_THAN)
-    @SqlType(StandardTypes.BOOLEAN)
-    public static boolean greaterThanBigInt(@SqlType(U_64_NAME) long left, @SqlType(StandardTypes.BIGINT) long right)
-    {
-        return left > right;
+        return U_64_TYPE.compareUnsignedLongs(left, right) > 0;
     }
 
     @ScalarOperator(GREATER_THAN_OR_EQUAL)
     @SqlType(StandardTypes.BOOLEAN)
     public static boolean greaterThanOrEqual(@SqlType(U_64_NAME) long left, @SqlType(U_64_NAME) long right)
     {
-        return left >= right;
+        return U_64_TYPE.compareUnsignedLongs(left, right) >= 0;
     }
 
     @ScalarOperator(BETWEEN)
     @SqlType(StandardTypes.BOOLEAN)
     public static boolean between(@SqlType(U_64_NAME) long value, @SqlType(U_64_NAME) long min, @SqlType(U_64_NAME) long max)
     {
-        return min <= value && value <= max;
+        return U_64_TYPE.compareUnsignedLongs(min, value) <= 0
+                && U_64_TYPE.compareUnsignedLongs(value, max) <= 0;
     }
 
     @ScalarOperator(HASH_CODE)
@@ -110,12 +91,5 @@ public final class U64Operators
         catch (ArithmeticException e) {
             throw new PrestoException(NUMERIC_VALUE_OUT_OF_RANGE, "Out of range for integer: " + value, e);
         }
-    }
-
-    @ScalarOperator(CAST)
-    @SqlType(StandardTypes.INTEGER)
-    public static long castToBigInt(@SqlType(U_64_NAME) long value)
-    {
-        return value;
     }
 }
