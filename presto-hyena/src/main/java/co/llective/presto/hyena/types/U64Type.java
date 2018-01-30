@@ -88,5 +88,4 @@ public final class U64Type
                 .writeLong(value)
                 .closeEntry();
     }
-
 }

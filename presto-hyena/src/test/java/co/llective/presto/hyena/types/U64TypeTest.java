@@ -7,9 +7,11 @@ import static org.testng.Assert.assertTrue;
 
 public class U64TypeTest
 {
-    public static class CompareUnsignedLongs {
+    public static class CompareUnsignedLongs
+    {
         @Test
-        public void comparesCorrectlyPositiveNumbers() {
+        public void comparesCorrectlyPositiveNumbers()
+        {
             long biggerUnsignedNumber = 0x00001000;
             long smallerUnsignedNumber = 0x00000001;
 
@@ -18,7 +20,8 @@ public class U64TypeTest
         }
 
         @Test
-        public void comparesCorrectlyPseudoNegativeNumbers() {
+        public void comparesCorrectlyPseudoNegativeNumbers()
+        {
             // java uses two's complement ints
             Long biggerUnsignedNumber = 0x8000000000000002L;    // -9223372036854775806
             Long smallerUnsignedNumber = 0x8000000000000001L;   // -9223372036854775807
@@ -33,7 +36,8 @@ public class U64TypeTest
         }
 
         @Test
-        public void comparePositiveWithPseudoNegativeNumber() {
+        public void comparePositiveWithPseudoNegativeNumber()
+        {
             Long pseudoNegativeNumber = 0x8000000000000000L;    // -2^63 signed or 2^64 unsigned
             Long positiveSignedNumber = 0x0000000000000001L;    // 1
 
@@ -49,7 +53,8 @@ public class U64TypeTest
         }
 
         @Test
-        public void comparesEqualNumbers() {
+        public void comparesEqualNumbers()
+        {
             Long someNumber = 0x0000000000000500L;
 
             int result = U64Type.U_64_TYPE.compareUnsignedLongs(someNumber, someNumber);
