@@ -20,10 +20,10 @@ RUN apt-get update -y && \
     pax-utils
 
 RUN groupadd -g 10055 presto && \
-    adduser --no-create-home --home /opt/presto --system --shell /bin/false --gecos 'presto dedicated user' --uid 10023 --gid 10023 --disabled-password presto
+    adduser --no-create-home --home /opt/presto --system --shell /bin/false --gecos 'presto dedicated user' --uid 10055 --gid 10055 --disabled-password presto
 
 RUN groupadd -g 10056 hyena && \
-    adduser --no-create-home --system --shell /bin/false --gecos 'hyena dedicated user' --uid 10024 --gid 10024 --disabled-password hyena && \
+    adduser --no-create-home --system --shell /bin/false --gecos 'hyena dedicated user' --uid 10056 --gid 10056 --disabled-password hyena && \
     usermod -a -G hyena presto
 
 RUN apt-get install -y nanomsg
