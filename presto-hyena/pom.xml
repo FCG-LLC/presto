@@ -110,7 +110,6 @@
             <url>http://clojars.org/repo</url>
         </repository>
     </repositories>
-
     <build>
         <plugins>
             <plugin>
@@ -126,6 +125,15 @@
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.mycila</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <configuration>
+                    <excludes combine.children="append">
+                        <exclude>src/**</exclude>
+                    </excludes>
+                </configuration>
             </plugin>
         </plugins>
     </build>
