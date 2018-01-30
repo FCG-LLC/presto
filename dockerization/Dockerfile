@@ -19,10 +19,10 @@ RUN apt-get update -y && \
     paxctl \
     pax-utils
 
-RUN groupadd -g 10023 presto && \
+RUN groupadd -g 10055 presto && \
     adduser --no-create-home --home /opt/presto --system --shell /bin/false --gecos 'presto dedicated user' --uid 10023 --gid 10023 --disabled-password presto
 
-RUN groupadd -g 10024 hyena && \
+RUN groupadd -g 10056 hyena && \
     adduser --no-create-home --system --shell /bin/false --gecos 'hyena dedicated user' --uid 10024 --gid 10024 --disabled-password hyena && \
     usermod -a -G hyena presto
 
