@@ -27,15 +27,15 @@ import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
 import io.airlift.log.Logger;
 import org.apache.commons.lang3.tuple.Pair;
 
 import javax.inject.Inject;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
@@ -145,10 +145,12 @@ public class HyenaSplitManager
         });
 
         Node currentNode = nodeManager.getCurrentNode();
-        List<ConnectorSplit> splits = partitions.stream()
-                .filter(partitionInfo -> !prunePartitionOnTs(partitionInfo, tsRanges))
-                .map(partition -> new HyenaSplit(currentNode.getHostAndPort(), Sets.newHashSet(partition.getId()), effectivePredicate))
-                .collect(Collectors.toList());
+//        List<ConnectorSplit> splits = partitions.stream()
+//                .filter(partitionInfo -> !prunePartitionOnTs(partitionInfo, tsRanges))
+//                .map(partition -> new HyenaSplit(currentNode.getHostAndPort(), Sets.newHashSet(partition.getId()), effectivePredicate))
+//                .collect(Collectors.toList());
+
+        List<ConnectorSplit> splits = Arrays.asList(new HyenaSplit(currentNode.getHostAndPort(), new HashSet<>(), effectivePredicate));
 
         return new FixedSplitSource(splits);
     }
