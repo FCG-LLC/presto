@@ -70,8 +70,6 @@ public class HyenaRecordCursor
     private final HyenaSession hyenaSession;
     private HyenaApi.HyenaOpMetadata hyenaOpMetadata;
 
-    private List<String> fields;
-
     private final ScanResult result;
     private int rowPosition;
     private final int rowCount;
@@ -267,23 +265,29 @@ public class HyenaRecordCursor
         BlockHolder holder = getBlockHolderOrThrow(field);
         Block block = holder.getBlock();
         switch (holder.getType()) {
-            case I64Dense:
-            case I32Dense:
-            case I16Dense:
             case I8Dense:
-            case U32Dense:
-            case U16Dense:
+                return ((DenseBlock<Byte>) block).getData().get(rowPosition).longValue();
+            case I16Dense:
             case U8Dense:
+                return ((DenseBlock<Short>) block).getData().get(rowPosition).longValue();
+            case I32Dense:
+            case U16Dense:
+                return ((DenseBlock<Integer>) block).getData().get(rowPosition).longValue();
+            case I64Dense:
+            case U32Dense:
                 return ((DenseBlock<Long>) block).getData().get(rowPosition);
             case U64Dense:
                 return ((DenseBlock<BigInteger>) block).getData().get(rowPosition).longValue();
-            case I64Sparse:
-            case I32Sparse:
-            case I16Sparse:
             case I8Sparse:
-            case U32Sparse:
-            case U16Sparse:
+                return ((SparseBlock<Byte>) block).getMaybe(rowPosition).get().longValue();
+            case I16Sparse:
             case U8Sparse:
+                return ((SparseBlock<Short>) block).getMaybe(rowPosition).get().longValue();
+            case I32Sparse:
+            case U16Sparse:
+                return ((SparseBlock<Integer>) block).getMaybe(rowPosition).get().longValue();
+            case I64Sparse:
+            case U32Sparse:
                 return ((SparseBlock<Long>) block).getMaybe(rowPosition).get();
             case U64Sparse:
                 return ((SparseBlock<BigInteger>) block).getMaybe(rowPosition).get().longValue();
