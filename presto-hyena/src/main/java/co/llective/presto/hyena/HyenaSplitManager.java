@@ -27,15 +27,15 @@ import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
 import io.airlift.log.Logger;
 import org.apache.commons.lang3.tuple.Pair;
 
 import javax.inject.Inject;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
@@ -124,31 +124,15 @@ public class HyenaSplitManager
     public ConnectorSplitSource getSplits(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorTableLayoutHandle layout)
     {
         HyenaTableLayoutHandle layoutHandle = (HyenaTableLayoutHandle) layout;
-        HyenaTableHandle tableHandle = layoutHandle.getTable();
 
         TupleDomain<HyenaColumnHandle> effectivePredicate = layoutHandle.getConstraint()
                 .transform(HyenaColumnHandle.class::cast);
 
-        List<PartitionInfo> partitions = hyenaSession.getAvailablePartitions();
-
-        // TODO: this works for single node only as of now
-        // TODO: do partition pruning basing on other features (sources?)
-
-        List<Pair<Long, Long>> tsRanges = new ArrayList<>();
-        effectivePredicate.getColumnDomains().map(columnDomains -> {
-            for (TupleDomain.ColumnDomain<HyenaColumnHandle> domain : columnDomains) {
-                if (HyenaMetadata.TIMESTAMP_COLUMN_NAME.equals(domain.getColumn().getColumnName())) {
-                    tsRanges.addAll(extractAllowedTimestampRanges(domain));
-                }
-            }
-            return true;
-        });
-
         Node currentNode = nodeManager.getCurrentNode();
-        List<ConnectorSplit> splits = partitions.stream()
-                .filter(partitionInfo -> !prunePartitionOnTs(partitionInfo, tsRanges))
-                .map(partition -> new HyenaSplit(currentNode.getHostAndPort(), Sets.newHashSet(partition.getId()), effectivePredicate))
-                .collect(Collectors.toList());
+
+        //TODO: Right now it's single split which causes all resulting data (after pushed-down filters) land in RAM.
+        //TODO: We need to create splits based on source and multiple time ranges.
+        List<ConnectorSplit> splits = Collections.singletonList(new HyenaSplit(currentNode.getHostAndPort(), new HashSet<>(), effectivePredicate));
 
         return new FixedSplitSource(splits);
     }
