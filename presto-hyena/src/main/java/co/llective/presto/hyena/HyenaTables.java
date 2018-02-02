@@ -15,6 +15,7 @@ package co.llective.presto.hyena;
 
 import co.llective.hyena.api.BlockType;
 import co.llective.hyena.api.Column;
+import co.llective.presto.hyena.types.U64Type;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.type.Type;
@@ -80,9 +81,10 @@ public class HyenaTables
                 return INTEGER;
             case I64Dense:
             case I64Sparse:
+                return BIGINT;
             case U64Dense:
             case U64Sparse:
-                return BIGINT;
+                return U64Type.U_64_TYPE;
             case String:
                 return VARCHAR;
             default:

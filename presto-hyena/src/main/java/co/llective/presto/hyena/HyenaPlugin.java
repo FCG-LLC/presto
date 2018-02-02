@@ -13,9 +13,17 @@
  */
 package co.llective.presto.hyena;
 
+import co.llective.presto.hyena.types.U64BigIntOperators;
+import co.llective.presto.hyena.types.U64Operators;
+import co.llective.presto.hyena.types.U64Type;
 import com.facebook.presto.spi.Plugin;
 import com.facebook.presto.spi.connector.ConnectorFactory;
+import com.facebook.presto.spi.type.Type;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
+
+import java.util.Set;
 
 public class HyenaPlugin
         implements Plugin
@@ -24,5 +32,20 @@ public class HyenaPlugin
     public Iterable<ConnectorFactory> getConnectorFactories()
     {
         return ImmutableList.of(new HyenaConnectorFactory());
+    }
+
+    @Override
+    public Iterable<Type> getTypes()
+    {
+        return Lists.newArrayList(U64Type.U_64_TYPE);
+    }
+
+    @Override
+    public Set<Class<?>> getFunctions()
+    {
+        return ImmutableSet.<Class<?>>builder()
+                .add(U64Operators.class)
+                .add(U64BigIntOperators.class)
+                .build();
     }
 }
