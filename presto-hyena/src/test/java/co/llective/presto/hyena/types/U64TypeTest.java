@@ -1,3 +1,16 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package co.llective.presto.hyena.types;
 
 import org.testng.annotations.Test;
@@ -7,9 +20,11 @@ import static org.testng.Assert.assertTrue;
 
 public class U64TypeTest
 {
-    public static class CompareUnsignedLongs {
+    public static class CompareUnsignedLongs
+    {
         @Test
-        public void comparesCorrectlyPositiveNumbers() {
+        public void comparesCorrectlyPositiveNumbers()
+        {
             long biggerUnsignedNumber = 0x00001000;
             long smallerUnsignedNumber = 0x00000001;
 
@@ -18,7 +33,8 @@ public class U64TypeTest
         }
 
         @Test
-        public void comparesCorrectlyPseudoNegativeNumbers() {
+        public void comparesCorrectlyPseudoNegativeNumbers()
+        {
             // java uses two's complement ints
             Long biggerUnsignedNumber = 0x8000000000000002L;    // -9223372036854775806
             Long smallerUnsignedNumber = 0x8000000000000001L;   // -9223372036854775807
@@ -33,7 +49,8 @@ public class U64TypeTest
         }
 
         @Test
-        public void comparePositiveWithPseudoNegativeNumber() {
+        public void comparePositiveWithPseudoNegativeNumber()
+        {
             Long pseudoNegativeNumber = 0x8000000000000000L;    // -2^63 signed or 2^64 unsigned
             Long positiveSignedNumber = 0x0000000000000001L;    // 1
 
@@ -49,7 +66,8 @@ public class U64TypeTest
         }
 
         @Test
-        public void comparesEqualNumbers() {
+        public void comparesEqualNumbers()
+        {
             Long someNumber = 0x0000000000000500L;
 
             int result = U64Type.U_64_TYPE.compareUnsignedLongs(someNumber, someNumber);

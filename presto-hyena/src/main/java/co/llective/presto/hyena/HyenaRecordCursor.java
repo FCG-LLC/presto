@@ -139,7 +139,8 @@ public class HyenaRecordCursor
                                             if (value < 0) {
                                                 builder = builder.withOp(ScanComparison.Gt);
                                                 builder = builder.withValue(UnsignedLong.MAX_VALUE.longValue());
-                                            } else {
+                                            }
+                                            else {
                                                 builder = builder.withValue(value);
                                             }
                                         }
@@ -174,7 +175,8 @@ public class HyenaRecordCursor
                                             if (value < 0) {
                                                 builder = builder.withOp(ScanComparison.GtEq);
                                                 builder = builder.withValue(UnsignedLong.ZERO.longValue());
-                                            } else {
+                                            }
+                                            else {
                                                 builder = builder.withValue(value);
                                             }
                                         }
