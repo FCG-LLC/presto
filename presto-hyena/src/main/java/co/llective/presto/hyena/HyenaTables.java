@@ -18,6 +18,7 @@ import co.llective.hyena.api.Column;
 import co.llective.presto.hyena.types.U64Type;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
+import com.facebook.presto.spi.type.SmallintType;
 import com.facebook.presto.spi.type.Type;
 import com.google.common.collect.ImmutableMap;
 
@@ -31,6 +32,7 @@ import java.util.stream.Collectors;
 import static co.llective.presto.hyena.HyenaMetadata.PRESTO_HYENA_SCHEMA;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
+import static com.facebook.presto.spi.type.SmallintType.SMALLINT;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -66,6 +68,8 @@ public class HyenaTables
     private Type convertBlockType(BlockType blockType)
     {
         switch (blockType) {
+            case U8Dense:
+                return SMALLINT;
             case I8Sparse:
             case I8Dense:
             case I16Sparse:
@@ -73,7 +77,6 @@ public class HyenaTables
             case I32Sparse:
             case I32Dense:
             case U8Sparse:
-            case U8Dense:
             case U16Sparse:
             case U16Dense:
             case U32Sparse:

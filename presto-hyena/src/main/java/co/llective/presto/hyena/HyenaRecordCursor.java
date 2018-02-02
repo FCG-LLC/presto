@@ -53,6 +53,7 @@ import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
+import static com.facebook.presto.spi.type.SmallintType.SMALLINT;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.slice.Slices.utf8Slice;
@@ -206,6 +207,7 @@ public class HyenaRecordCursor
         hyenaOpMetadata = new HyenaApi.HyenaOpMetadata();
         result = this.hyenaSession.scan(req, hyenaOpMetadata);
         rowCount = getRowCount(result);
+        log.info("Number of rows received: " + rowCount);
     }
 
     private int getRowCount(ScanResult result)
@@ -262,18 +264,21 @@ public class HyenaRecordCursor
     @Override
     public long getLong(int field)
     {
-        checkFieldType(field, BIGINT, INTEGER, U64Type.U_64_TYPE);
+        checkFieldType(field, SMALLINT,  BIGINT, INTEGER, U64Type.U_64_TYPE);
 
         BlockHolder holder = getBlockHolderOrThrow(field);
         Block block = holder.getBlock();
         switch (holder.getType()) {
-            case I64Dense:
-            case I32Dense:
-            case I16Dense:
             case I8Dense:
-            case U32Dense:
-            case U16Dense:
+                return ((DenseBlock<Byte>) block).getData().get(rowPosition).longValue();
+            case I16Dense:
             case U8Dense:
+                return ((DenseBlock<Short>) block).getData().get(rowPosition).longValue();
+            case I32Dense:
+            case U16Dense:
+                return ((DenseBlock<Integer>) block).getData().get(rowPosition).longValue();
+            case I64Dense:
+            case U32Dense:
                 return ((DenseBlock<Long>) block).getData().get(rowPosition);
             case U64Dense:
                 return ((DenseBlock<BigInteger>) block).getData().get(rowPosition).longValue();
