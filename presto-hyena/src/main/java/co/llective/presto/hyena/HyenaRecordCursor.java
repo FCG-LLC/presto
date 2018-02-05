@@ -16,6 +16,7 @@ package co.llective.presto.hyena;
 import co.llective.hyena.api.Block;
 import co.llective.hyena.api.BlockHolder;
 import co.llective.hyena.api.BlockType;
+import co.llective.hyena.api.DataTriple;
 import co.llective.hyena.api.DenseBlock;
 import co.llective.hyena.api.FilterType;
 import co.llective.hyena.api.HyenaApi;
@@ -353,7 +354,12 @@ public class HyenaRecordCursor
 
     private BlockHolder getBlockHolderOrThrow(int field)
     {
-        Optional<BlockHolder> optionalHolder = this.result.getData().get(field).getData();
+        long columnId = columns.get(field).getOrdinalPosition();
+        Optional<BlockHolder> optionalHolder = this.result.getData().stream()
+                .filter(triple -> triple.getColumnId() == columnId)
+                .map(DataTriple::getData)
+                .findFirst().orElse(Optional.empty());
+
         if (!optionalHolder.isPresent()) {
             throw new RuntimeException("Empty block holder");
         }
