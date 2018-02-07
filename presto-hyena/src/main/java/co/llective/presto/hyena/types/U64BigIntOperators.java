@@ -19,6 +19,7 @@ import com.facebook.presto.spi.type.StandardTypes;
 
 import static co.llective.presto.hyena.types.U64Type.U_64_NAME;
 import static co.llective.presto.hyena.types.U64Type.U_64_TYPE;
+import static com.facebook.presto.spi.function.OperatorType.BETWEEN;
 import static com.facebook.presto.spi.function.OperatorType.CAST;
 import static com.facebook.presto.spi.function.OperatorType.GREATER_THAN;
 import static com.facebook.presto.spi.function.OperatorType.GREATER_THAN_OR_EQUAL;
@@ -110,6 +111,22 @@ public class U64BigIntOperators
         else {
             return U_64_TYPE.compareUnsignedLongs(left, right) > 0;
         }
+    }
+
+    /**
+     * Handles between operator between {@link U64Type} and two BigInts.
+     *
+     * @param value u64 number
+     * @param min long number
+     * @param max long number
+     * @return Returns info if u64 is in between specified longs
+     */
+    @ScalarOperator(BETWEEN)
+    @SqlType(StandardTypes.BOOLEAN)
+    public static boolean betweenBigInts(@SqlType(U_64_NAME) long value, @SqlType(StandardTypes.BIGINT) long min, @SqlType(StandardTypes.BIGINT) long max)
+    {
+        return greaterThanOrEqualBigInt(value, min)
+                && lessThanOrEqualBigInt(value, max);
     }
 
     /**
