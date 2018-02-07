@@ -263,6 +263,11 @@ public class HyenaRecordCursor
     {
         checkFieldType(field, BIGINT, INTEGER, U64Type.U_64_TYPE);
 
+        // temporal workaround for not filled source_id by hyena (we only have packet_headers now)
+        if (columns.get(field).getColumnName().equals("source_id")) {
+            return 1L;
+        }
+
         BlockHolder holder = getBlockHolderOrThrow(field);
         Block block = holder.getBlock();
         switch (holder.getType()) {
