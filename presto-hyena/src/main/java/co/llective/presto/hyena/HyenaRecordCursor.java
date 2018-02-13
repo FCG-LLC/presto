@@ -72,7 +72,7 @@ public class HyenaRecordCursor
     private HyenaApi.HyenaOpMetadata hyenaOpMetadata;
 
     private final ScanResult result;
-    private int rowPosition;
+    private int rowPosition = -1; // presto first advances next row and then fetch data
     private final int rowCount;
 
     public HyenaRecordCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, HostAddress address, Set<UUID> partitionIds, TupleDomain<HyenaColumnHandle> predicate)
