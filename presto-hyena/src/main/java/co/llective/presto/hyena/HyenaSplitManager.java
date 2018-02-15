@@ -133,16 +133,9 @@ public class HyenaSplitManager
         //TODO: We need to create splits based on source and multiple time ranges.
 //        List<ConnectorSplit> splits = Collections.singletonList(new HyenaSplit(currentNode.getHostAndPort(), new HashSet<>(), effectivePredicate));
         List<ConnectorSplit> splits = new ArrayList<>();
-        splits.add(new HyenaSplit(currentNode.getHostAndPort(), new HashSet<>(), effectivePredicate));
-        splits.add(new HyenaSplit(currentNode.getHostAndPort(), new HashSet<>(), effectivePredicate));
-        splits.add(new HyenaSplit(currentNode.getHostAndPort(), new HashSet<>(), effectivePredicate));
-        splits.add(new HyenaSplit(currentNode.getHostAndPort(), new HashSet<>(), effectivePredicate));
-        splits.add(new HyenaSplit(currentNode.getHostAndPort(), new HashSet<>(), effectivePredicate));
-        splits.add(new HyenaSplit(currentNode.getHostAndPort(), new HashSet<>(), effectivePredicate));
-        splits.add(new HyenaSplit(currentNode.getHostAndPort(), new HashSet<>(), effectivePredicate));
-        splits.add(new HyenaSplit(currentNode.getHostAndPort(), new HashSet<>(), effectivePredicate));
-        splits.add(new HyenaSplit(currentNode.getHostAndPort(), new HashSet<>(), effectivePredicate));
-        splits.add(new HyenaSplit(currentNode.getHostAndPort(), new HashSet<>(), effectivePredicate));
+        for (int i = 0; i < 1000; i++) {
+            splits.add(new HyenaSplit(currentNode.getHostAndPort(), new HashSet<>(), effectivePredicate));
+        }
 
         return new FixedSplitSource(splits);
     }
