@@ -203,7 +203,11 @@ public class HyenaRecordCursor
 
         this.hyenaSession = baseSession.recordSetProviderSession();
         hyenaOpMetadata = new HyenaApi.HyenaOpMetadata();
+
+        long a = System.currentTimeMillis();
         result = this.hyenaSession.scan(req, hyenaOpMetadata);
+        System.out.println(System.currentTimeMillis() - a + "ms");
+
         rowCount = getRowCount(result);
     }
 

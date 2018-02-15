@@ -46,6 +46,13 @@ public class TestHyenaRecordSet
         assertData(hyenaSession, metadata);
     }
 
+    @Test
+    public void test()
+    {
+        Short shorty = -20000;
+        System.out.println(Short.toUnsignedInt(shorty));
+    }
+
     private static void assertData(HyenaSession hyenaSession, HyenaMetadata metadata)
     {
         SchemaTableName tableName = metadata.listTables(null, null).get(0);
