@@ -133,7 +133,7 @@ public class HyenaSplitManager
         //TODO: We need to create splits based on source and multiple time ranges.
 //        List<ConnectorSplit> splits = Collections.singletonList(new HyenaSplit(currentNode.getHostAndPort(), new HashSet<>(), effectivePredicate));
         List<ConnectorSplit> splits = new ArrayList<>();
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < 1; i++) {
             splits.add(new HyenaSplit(currentNode.getHostAndPort(), new HashSet<>(), effectivePredicate));
         }
 

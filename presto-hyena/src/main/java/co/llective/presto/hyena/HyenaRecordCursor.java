@@ -71,12 +71,17 @@ public class HyenaRecordCursor
     private final HyenaSession hyenaSession;
     private HyenaApi.HyenaOpMetadata hyenaOpMetadata;
 
-    private final ScanResult result;
+    private ScanResult result;
     private int rowPosition;
     private final int rowCount;
 
+    private static final Object lock = new Object();
+    static int cursorNo;
+    private int myCursorNo;
+
     public HyenaRecordCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, HostAddress address, Set<UUID> partitionIds, TupleDomain<HyenaColumnHandle> predicate)
     {
+        myCursorNo = ++cursorNo;
         HyenaSession baseSession = requireNonNull(hyenaSession, "hyenaSession is null");
         this.columns = requireNonNull(columns, "columns is null");
         this.partitionIds = partitionIds;
@@ -204,9 +209,19 @@ public class HyenaRecordCursor
         this.hyenaSession = baseSession.recordSetProviderSession();
         hyenaOpMetadata = new HyenaApi.HyenaOpMetadata();
 
-        long a = System.currentTimeMillis();
-        result = this.hyenaSession.scan(req, hyenaOpMetadata);
-        System.out.println(System.currentTimeMillis() - a + "ms");
+
+        synchronized (lock) {
+            long a = System.currentTimeMillis();
+            log.error(myCursorNo + " starting scan for split");
+            result = this.hyenaSession.scan(req, hyenaOpMetadata);
+//            List<DataTriple> dataTriples = new ArrayList<>(24);
+//            DenseBlock<Long> block = new DenseBlock<>(BlockType.U64Dense, 50000000);
+//            dataTriples.add(new DataTriple(0, BlockType.U64Dense, Optional.of(new BlockHolder(BlockType.U64Dense, block))));
+//            ScanResult res =
+//            result = new ScanResult(dataTriples);
+            log.error(myCursorNo + " finished scan for split and deserialized output");
+            System.out.println(System.currentTimeMillis() - a + "ms");
+        }
 
         rowCount = getRowCount(result);
     }
@@ -252,7 +267,11 @@ public class HyenaRecordCursor
     @Override
     public boolean advanceNextPosition()
     {
+//        log.error(myCursorNo + " advancing next position " + (rowPosition + 1));
+        if (rowPosition == 1) { log.error(myCursorNo + " Started scanning cursor"); }
+        if (rowPosition == rowCount - 1) { log.error(myCursorNo + " Finished scanning cursor"); }
         return ++rowPosition < rowCount;
+
     }
 
     @Override
@@ -391,6 +410,9 @@ public class HyenaRecordCursor
     @Override
     public void close()
     {
+        this.result = null;
+        System.gc();
+        log.error(myCursorNo + " CLOSING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         this.hyenaSession.close();
     }
 }
