@@ -29,34 +29,10 @@ public class NativeHyenaSession
         implements HyenaSession
 {
     private final HyenaApi hyenaApi;
-    private final HyenaConfig hyenaConfig;
 
     public NativeHyenaSession(HyenaConfig config)
     {
-        hyenaConfig = config;
-        hyenaApi = new HyenaApi();
-        try {
-            hyenaApi.connect(config.getHyenaHost());
-        }
-        catch (IOException ioe) {
-            throw new RuntimeException("Couldn't connect to hyena: " + config.getHyenaHost(), ioe);
-        }
-    }
-
-    public void close()
-    {
-        try {
-            hyenaApi.close();
-        }
-        catch (IOException ioe) {
-            throw new RuntimeException("Error while closing connection to hyena", ioe);
-        }
-    }
-
-    @Override
-    public NativeHyenaSession recordSetProviderSession()
-    {
-        return new NativeHyenaSession(hyenaConfig);
+        hyenaApi = new HyenaApi(config.getHyenaHost());
     }
 
     @Override
@@ -86,10 +62,10 @@ public class NativeHyenaSession
     }
 
     @Override
-    public ScanResult scan(ScanRequest req, HyenaApi.HyenaOpMetadata metadata)
+    public ScanResult scan(ScanRequest req)
     {
         try {
-            return hyenaApi.scan(req, metadata);
+            return hyenaApi.scan(req);
         }
         catch (IOException | ReplyException exc) {
             throw new RuntimeException("Error while scanning", exc);
