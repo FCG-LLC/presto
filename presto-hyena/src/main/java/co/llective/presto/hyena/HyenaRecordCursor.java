@@ -44,7 +44,6 @@ import org.apache.commons.lang3.StringUtils;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -205,6 +204,7 @@ public class HyenaRecordCursor
         log.debug(myCursorNo + " finished scan for split and deserialized output in " + (System.currentTimeMillis() - startTime) + "ms");
 
         rowCount = getRowCount(result);
+        log.warn("row count: " + rowCount);
     }
 
     private int getRowCount(ScanResult result)
@@ -212,18 +212,16 @@ public class HyenaRecordCursor
         if (result.getData().isEmpty()) {
             return 0;
         }
-        return result.getData().get(0).getData()
-                .map(bh -> bh.getBlock().count())
+        Long index = columns.stream().filter(x -> x.getColumnName().equals("timestamp")).findFirst().map(HyenaColumnHandle::getOrdinalPosition).orElse(0L);
+        log.error("ts index: " + index);
+        log.error("data:\n" + result);
+//        return result.getData().stream().filter(x -> x.getColumnId() == index).findFirst().get().getData()
+        return result.getData().stream().filter(x -> x.getColumnId() == index).findFirst()
+                .map(x -> x.getData().map(bh -> bh.getBlock().count()).orElse(0))
                 .orElse(0);
-    }
-
-    private void preparePredicates(TupleDomain<HyenaColumnHandle> predicate)
-    {
-        Optional<Map<HyenaColumnHandle, Domain>> domains = predicate.getDomains();
-        if (!domains.isPresent()) {
-            return;
-        }
-        // SUMTHIN
+//        return result.getData().get(index.intValue()).getData()
+//                .map(bh -> bh.getBlock().count())
+//                .orElse(0);
     }
 
     @Override

@@ -36,7 +36,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 public class HyenaTables
 {
-    private final Map<SchemaTableName, List<ColumnMetadata>> tableColumns;
+    private Map<SchemaTableName, List<ColumnMetadata>> tableColumns;
     private final SchemaTableName schemaTableName;
     private final HyenaTableHandle tableHandle;
 
@@ -51,11 +51,16 @@ public class HyenaTables
 
         schemaTableName = getSchemaTableName();
 
-        ImmutableMap.Builder<SchemaTableName, List<ColumnMetadata>> tableColumnsBuilder = ImmutableMap.builder();
-        tableColumnsBuilder.put(schemaTableName, tableColumns(hyenaSession.getAvailableColumns()));
-        tableColumns = tableColumnsBuilder.build();
+        tableColumns = fetchTableColumns(hyenaSession);
 
         tableHandle = new HyenaTableHandle(schemaTableName);
+    }
+
+    private ImmutableMap<SchemaTableName, List<ColumnMetadata>> fetchTableColumns(HyenaSession hyenaSession)
+    {
+        ImmutableMap.Builder<SchemaTableName, List<ColumnMetadata>> tableColumnsBuilder = ImmutableMap.builder();
+        tableColumnsBuilder.put(schemaTableName, tableColumns(hyenaSession.getAvailableColumns()));
+        return tableColumnsBuilder.build();
     }
 
     private static SchemaTableName getSchemaTableName()
@@ -114,6 +119,7 @@ public class HyenaTables
 
     public List<ColumnMetadata> getColumns(HyenaTableHandle tableHandle)
     {
+        tableColumns = fetchTableColumns(hyenaSession);
         checkArgument(tableColumns.containsKey(tableHandle.getSchemaTableName()), "Table %s not registered", tableHandle.getSchemaTableName());
         return tableColumns.get(tableHandle.getSchemaTableName());
     }
