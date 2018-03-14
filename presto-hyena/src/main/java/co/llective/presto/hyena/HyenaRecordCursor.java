@@ -200,17 +200,18 @@ public class HyenaRecordCursor
         rowCount = getRowCount(result);
     }
 
-    private int getRowCount(ScanResult result)
+    int getRowCount(ScanResult result)
     {
         if (result.getData().isEmpty()) {
             return 0;
         }
 
         return result.getData().stream()
-                .filter(x -> x.getColumnType().isDense()) //if dense block
+                //if dense block
+                .filter(x -> x.getColumnType().isDense())
                 .map(dt -> dt.getData().map(bh -> bh.getBlock().count()).orElse(0))
                 .findFirst()
-                // check sparse one
+                // if no dense blocks then check sparse ones
                 .orElseGet(() ->
                         result.getData().stream().map(dt -> dt.getData().map(bh -> {
                             List<Integer> offsets = ((SparseBlock) bh.getBlock()).getOffsetData();
