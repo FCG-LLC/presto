@@ -43,8 +43,8 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -205,18 +205,20 @@ public class HyenaRecordCursor
         if (result.getData().isEmpty()) {
             return 0;
         }
-        return result.getData().get(0).getData()
-                .map(bh -> bh.getBlock().count())
-                .orElse(0);
-    }
 
-    private void preparePredicates(TupleDomain<HyenaColumnHandle> predicate)
-    {
-        Optional<Map<HyenaColumnHandle, Domain>> domains = predicate.getDomains();
-        if (!domains.isPresent()) {
-            return;
-        }
-        // SUMTHIN
+        return result.getData().stream()
+                .filter(x -> x.getColumnType().isDense()) //if dense block
+                .map(dt -> dt.getData().map(bh -> bh.getBlock().count()).orElse(0))
+                .findFirst()
+                // check sparse one
+                .orElseGet(() ->
+                        result.getData().stream().map(dt -> dt.getData().map(bh -> {
+                            List<Integer> offsets = ((SparseBlock) bh.getBlock()).getOffsetData();
+                            // last element of offset shows last non-null element of row
+                            return offsets.get(offsets.size() - 1);
+                        }).orElse(0))
+                                // we're taking max count of all columns
+                                .max(Comparator.naturalOrder()).orElse(0));
     }
 
     @Override
