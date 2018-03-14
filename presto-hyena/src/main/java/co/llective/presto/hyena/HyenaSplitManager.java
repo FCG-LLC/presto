@@ -34,7 +34,6 @@ import javax.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
@@ -132,7 +131,7 @@ public class HyenaSplitManager
 
         //TODO: Right now it's single split which causes all resulting data (after pushed-down filters) land in RAM.
         //TODO: We need to create splits based on source and multiple time ranges.
-        List<ConnectorSplit> splits = Collections.singletonList(new HyenaSplit(currentNode.getHostAndPort(), new HashSet<>(), effectivePredicate));
+        List<ConnectorSplit> splits = Collections.singletonList(new HyenaSplit(currentNode.getHostAndPort(), effectivePredicate));
 
         return new FixedSplitSource(splits);
     }

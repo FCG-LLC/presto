@@ -45,9 +45,9 @@ public class HyenaTables
     public static final String PRESTO_HYENA_TABLE_NAME = "cs";
 
     @Inject
-    public HyenaTables(HyenaConfig config)
+    public HyenaTables(HyenaSession hyenaSession)
     {
-        hyenaSession = new NativeHyenaSession(config);
+        this.hyenaSession = hyenaSession;
 
         schemaTableName = getSchemaTableName();
 
@@ -76,9 +76,9 @@ public class HyenaTables
             case U8Dense:
             case U16Sparse:
             case U16Dense:
-            case U32Sparse:
-            case U32Dense:
                 return INTEGER;
+            case U32Dense:
+            case U32Sparse:
             case I64Dense:
             case I64Sparse:
                 return BIGINT;
