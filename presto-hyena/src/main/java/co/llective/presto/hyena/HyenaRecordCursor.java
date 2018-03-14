@@ -19,7 +19,6 @@ import co.llective.hyena.api.BlockType;
 import co.llective.hyena.api.DataTriple;
 import co.llective.hyena.api.DenseBlock;
 import co.llective.hyena.api.FilterType;
-import co.llective.hyena.api.HyenaApi;
 import co.llective.hyena.api.ScanComparison;
 import co.llective.hyena.api.ScanFilter;
 import co.llective.hyena.api.ScanFilterBuilder;
@@ -48,7 +47,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
@@ -66,26 +64,22 @@ public class HyenaRecordCursor
     private static final Logger log = Logger.get(HyenaRecordCursor.class);
 
     private final List<HyenaColumnHandle> columns;
-    private final Set<UUID> partitionIds;
     private final TupleDomain<HyenaColumnHandle> predicate;
     private final HyenaSession hyenaSession;
-    private HyenaApi.HyenaOpMetadata hyenaOpMetadata;
 
     private final ScanResult result;
     private int rowPosition = -1; // presto first advances next row and then fetch data
     private final int rowCount;
 
-    public HyenaRecordCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, HostAddress address, Set<UUID> partitionIds, TupleDomain<HyenaColumnHandle> predicate)
+    public HyenaRecordCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, HostAddress address, TupleDomain<HyenaColumnHandle> predicate)
     {
-        HyenaSession baseSession = requireNonNull(hyenaSession, "hyenaSession is null");
+        this.hyenaSession = requireNonNull(hyenaSession, "hyenaSession is null");
         this.columns = requireNonNull(columns, "columns is null");
-        this.partitionIds = partitionIds;
         this.predicate = requireNonNull(predicate, "predicate is null");
 
         ScanRequest req = new ScanRequest();
         req.setMinTs(0);
         req.setMaxTs(Long.MAX_VALUE);
-        req.setPartitionIds(this.partitionIds);
         req.setProjection(new ArrayList<>());
         req.setFilters(new ArrayList<>());
 
@@ -201,9 +195,8 @@ public class HyenaRecordCursor
 
         log.info("Filters: " + StringUtils.join(req.getFilters(), ", "));
 
-        this.hyenaSession = baseSession.recordSetProviderSession();
-        hyenaOpMetadata = new HyenaApi.HyenaOpMetadata();
-        result = this.hyenaSession.scan(req, hyenaOpMetadata);
+        result = this.hyenaSession.scan(req);
+
         rowCount = getRowCount(result);
     }
 
@@ -229,7 +222,7 @@ public class HyenaRecordCursor
     @Override
     public long getCompletedBytes()
     {
-        return this.hyenaOpMetadata.getBytes();
+        return 0;
     }
 
     @Override
@@ -387,6 +380,6 @@ public class HyenaRecordCursor
     @Override
     public void close()
     {
-        this.hyenaSession.close();
+        //TODO: cancel query in hyenaAPI (send abort request with requestID)
     }
 }
