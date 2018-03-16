@@ -13,6 +13,7 @@
  */
 package co.llective.presto.hyena;
 
+import co.llective.hyena.api.BlockType;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.type.Type;
@@ -29,16 +30,19 @@ public class HyenaColumnHandle
 {
     private final String columnName;
     private final Type columnType;
+    private final BlockType hyenaType;
     private final long ordinalPosition;
 
     @JsonCreator
     public HyenaColumnHandle(
             @JsonProperty("columnName") String columnName,
             @JsonProperty("columnType") Type columnType,
+            @JsonProperty("hyenaType") BlockType hyenaType,
             @JsonProperty("ordinalPosition") int ordinalPosition)
     {
         this.columnName = requireNonNull(columnName, "columnName is null");
         this.columnType = requireNonNull(columnType, "columnType is null");
+        this.hyenaType = hyenaType;
         this.ordinalPosition = ordinalPosition;
     }
 
@@ -52,6 +56,11 @@ public class HyenaColumnHandle
     public Type getColumnType()
     {
         return columnType;
+    }
+
+    @JsonProperty
+    public BlockType getHyenaType() {
+        return hyenaType;
     }
 
     @JsonProperty
@@ -77,6 +86,7 @@ public class HyenaColumnHandle
         HyenaColumnHandle that = (HyenaColumnHandle) o;
         return Objects.equals(columnName, that.columnName) &&
                 Objects.equals(columnType, that.columnType) &&
+                Objects.equals(hyenaType, that.hyenaType) &&
                 Objects.equals(ordinalPosition, that.ordinalPosition);
     }
 
@@ -92,6 +102,7 @@ public class HyenaColumnHandle
         return toStringHelper(this)
                 .add("columnName", columnName)
                 .add("columnType", columnType)
+                .add("hyenaType", hyenaType)
                 .add("ordinalPosition", ordinalPosition)
                 .toString();
     }

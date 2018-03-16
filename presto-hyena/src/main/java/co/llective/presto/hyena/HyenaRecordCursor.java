@@ -64,7 +64,6 @@ public class HyenaRecordCursor
     private static final Logger log = Logger.get(HyenaRecordCursor.class);
 
     private final List<HyenaColumnHandle> columns;
-    private final TupleDomain<HyenaColumnHandle> predicate;
     private final HyenaSession hyenaSession;
 
     private final ScanResult result;
@@ -75,7 +74,6 @@ public class HyenaRecordCursor
     {
         this.hyenaSession = requireNonNull(hyenaSession, "hyenaSession is null");
         this.columns = requireNonNull(columns, "columns is null");
-        this.predicate = requireNonNull(predicate, "predicate is null");
 
         ScanRequest req = new ScanRequest();
         req.setMinTs(0);
@@ -104,7 +102,7 @@ public class HyenaRecordCursor
                                     }
                                     else {
                                         Long val = (Long) range.getSingleValue();
-                                        req.getFilters().add(new ScanFilter(column.getOrdinalPosition(), ScanComparison.Eq, FilterType.I64, val, Optional.of("")));
+                                        req.getFilters().add(new ScanFilter(column.getOrdinalPosition(), ScanComparison.Eq, column.getHyenaType().mapToFilterType(), val, Optional.of("")));
                                     }
                                 }
                                 else {
