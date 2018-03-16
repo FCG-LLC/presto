@@ -74,4 +74,39 @@ public class U64TypeTest
             assertEquals(result, 0);
         }
     }
+
+    public static class CompareToSignedLong {
+        @Test
+        public void pseudoNegativeToNegativeNumberReturnsGreaterThanZero()
+        {
+            Long u64 = 0x1000000000000500L;
+            int result = U64Type.U_64_TYPE.compareToSignedLong(u64, -1);
+            assertEquals(result, 1);
+        }
+
+        @Test
+        public void positiveToNegativeNumberReturnsGreaterThanZero() {
+            Long u64 = 0x0000000000000500L;
+            int result = U64Type.U_64_TYPE.compareToSignedLong(u64, -1);
+            assertEquals(result, 1);
+        }
+
+        @Test
+        public void sameNumberReturnsZero() {
+            int result = U64Type.U_64_TYPE.compareToSignedLong(10L, 10L);
+            assertEquals(result, 0);
+        }
+
+        @Test
+        public void comparingLesserNumberReturnsMinusOne() {
+            int result = U64Type.U_64_TYPE.compareToSignedLong(10L, 15);
+            assertEquals(result, -1);
+        }
+
+        @Test
+        public void comparingGreaterNumberReturnsOne() {
+            int result = U64Type.U_64_TYPE.compareToSignedLong(10L, 5);
+            assertEquals(result, 1);
+        }
+    }
 }

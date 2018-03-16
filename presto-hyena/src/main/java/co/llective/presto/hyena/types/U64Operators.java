@@ -13,7 +13,6 @@
  */
 package co.llective.presto.hyena.types;
 
-import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.function.ScalarOperator;
 import com.facebook.presto.spi.function.SqlType;
 import com.facebook.presto.spi.type.AbstractLongType;
@@ -21,9 +20,7 @@ import com.facebook.presto.spi.type.StandardTypes;
 
 import static co.llective.presto.hyena.types.U64Type.U_64_NAME;
 import static co.llective.presto.hyena.types.U64Type.U_64_TYPE;
-import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
 import static com.facebook.presto.spi.function.OperatorType.BETWEEN;
-import static com.facebook.presto.spi.function.OperatorType.CAST;
 import static com.facebook.presto.spi.function.OperatorType.EQUAL;
 import static com.facebook.presto.spi.function.OperatorType.GREATER_THAN;
 import static com.facebook.presto.spi.function.OperatorType.GREATER_THAN_OR_EQUAL;
@@ -31,7 +28,6 @@ import static com.facebook.presto.spi.function.OperatorType.HASH_CODE;
 import static com.facebook.presto.spi.function.OperatorType.LESS_THAN;
 import static com.facebook.presto.spi.function.OperatorType.LESS_THAN_OR_EQUAL;
 import static com.facebook.presto.spi.function.OperatorType.NOT_EQUAL;
-import static java.lang.Math.toIntExact;
 
 public final class U64Operators
 {
@@ -92,17 +88,5 @@ public final class U64Operators
     public static long hashCode(@SqlType(U_64_NAME) long value)
     {
         return AbstractLongType.hash(value);
-    }
-
-    @ScalarOperator(CAST)
-    @SqlType(StandardTypes.INTEGER)
-    public static long castToInteger(@SqlType(U_64_NAME) long value)
-    {
-        try {
-            return toIntExact(value);
-        }
-        catch (ArithmeticException e) {
-            throw new PrestoException(NUMERIC_VALUE_OUT_OF_RANGE, "Out of range for integer: " + value, e);
-        }
     }
 }

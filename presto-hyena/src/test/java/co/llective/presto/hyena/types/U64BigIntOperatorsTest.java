@@ -18,7 +18,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
-public class U64OperatorsTest
+public class U64BigIntOperatorsTest
 {
     public static class LessThanBigInt
     {

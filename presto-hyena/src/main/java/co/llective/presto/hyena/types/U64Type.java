@@ -62,6 +62,13 @@ public final class U64Type
         return UnsignedLong.fromLongBits(leftValue).compareTo(UnsignedLong.fromLongBits(rightValue));
     }
 
+    public int compareToSignedLong(long u64Value, long signedValue) {
+        if (signedValue < 0) {
+            return 1;
+        }
+        return compareUnsignedLongs(u64Value, signedValue);
+    }
+
     @Override
     public long hash(Block block, int position)
     {
