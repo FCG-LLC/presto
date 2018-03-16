@@ -205,17 +205,22 @@ public class HyenaRecordCursor
         }
 
         return result.getData().stream()
+                //TODO: Hyena doesn't support source_id column properly yet
+                .filter(x -> !columns.get(((Long) x.getColumnId()).intValue()).getColumnName().equals("source_id"))
                 //if dense block
                 .filter(x -> x.getColumnType().isDense())
                 .map(dt -> dt.getData().map(bh -> bh.getBlock().count()).orElse(0))
                 .findFirst()
                 // if no dense blocks then check sparse ones
                 .orElseGet(() ->
-                        result.getData().stream().map(dt -> dt.getData().map(bh -> {
-                            List<Integer> offsets = ((SparseBlock) bh.getBlock()).getOffsetData();
-                            // last element of offset shows last non-null element of row
-                            return offsets.get(offsets.size() - 1);
-                        }).orElse(0))
+                        result.getData().stream()
+                                //TODO: Hyena doesn't support source_id column properly yet
+                                .filter(x -> !columns.get(((Long) x.getColumnId()).intValue()).getColumnName().equals("source_id"))
+                                .map(dt -> dt.getData().map(bh -> {
+                                    List<Integer> offsets = ((SparseBlock) bh.getBlock()).getOffsetData();
+                                    // last element of offset shows last non-null element of row
+                                    return offsets.get(offsets.size() - 1);
+                                }).orElse(0))
                                 // we're taking max count of all columns
                                 .max(Comparator.naturalOrder()).orElse(0));
     }

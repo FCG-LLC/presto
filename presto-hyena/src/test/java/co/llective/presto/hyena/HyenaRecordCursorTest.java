@@ -8,6 +8,7 @@ import co.llective.hyena.api.ScanResult;
 import co.llective.hyena.api.SparseBlock;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.predicate.TupleDomain;
+import com.facebook.presto.spi.type.IntegerType;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
@@ -109,7 +110,8 @@ public class HyenaRecordCursorTest
         {
             HyenaSession hyenaSession = mock(HyenaSession.class);
             when(hyenaSession.scan(any())).thenReturn(new ScanResult(Collections.emptyList()));
-            return new HyenaRecordCursor(hyenaSession, Collections.emptyList(), mock(HostAddress.class), TupleDomain.all());
+            HyenaColumnHandle handle = new HyenaColumnHandle("", IntegerType.INTEGER, BlockType.I16Sparse, 0);
+            return new HyenaRecordCursor(hyenaSession, Collections.singletonList(handle), mock(HostAddress.class), TupleDomain.all());
         }
 
         <T extends Number> DenseBlock<T> nElementDenseBlock(int n, T defVal)
