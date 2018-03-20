@@ -16,7 +16,6 @@ package co.llective.presto.hyena;
 import co.llective.hyena.api.BlockType;
 import co.llective.hyena.api.Column;
 import co.llective.presto.hyena.types.U64Type;
-import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.type.Type;
 import com.google.common.collect.ImmutableMap;
@@ -36,7 +35,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 public class HyenaTables
 {
-    private Map<SchemaTableName, List<ColumnMetadata>> tableColumns;
+    private Map<SchemaTableName, List<HyenaColumnMetadata>> tableColumns;
     private final SchemaTableName schemaTableName;
     private final HyenaTableHandle tableHandle;
 
@@ -56,9 +55,9 @@ public class HyenaTables
         tableHandle = new HyenaTableHandle(schemaTableName);
     }
 
-    private ImmutableMap<SchemaTableName, List<ColumnMetadata>> fetchTableColumns(HyenaSession hyenaSession)
+    private ImmutableMap<SchemaTableName, List<HyenaColumnMetadata>> fetchTableColumns(HyenaSession hyenaSession)
     {
-        ImmutableMap.Builder<SchemaTableName, List<ColumnMetadata>> tableColumnsBuilder = ImmutableMap.builder();
+        ImmutableMap.Builder<SchemaTableName, List<HyenaColumnMetadata>> tableColumnsBuilder = ImmutableMap.builder();
         tableColumnsBuilder.put(schemaTableName, tableColumns(hyenaSession.getAvailableColumns()));
         return tableColumnsBuilder.build();
     }
@@ -97,12 +96,12 @@ public class HyenaTables
         }
     }
 
-    private ColumnMetadata convertColumnMetadata(Column col)
+    private HyenaColumnMetadata convertColumnMetadata(Column col)
     {
-        return new ColumnMetadata(col.getName(), convertBlockType(col.getDataType()));
+        return new HyenaColumnMetadata(col.getName(), convertBlockType(col.getDataType()), col.getDataType());
     }
 
-    private List<ColumnMetadata> tableColumns(List<Column> hyenaColumns)
+    private List<HyenaColumnMetadata> tableColumns(List<Column> hyenaColumns)
     {
         return hyenaColumns.stream().map(hyenaCol -> convertColumnMetadata(hyenaCol)).collect(Collectors.toList());
     }
@@ -117,7 +116,7 @@ public class HyenaTables
         return Arrays.asList(schemaTableName);
     }
 
-    public List<ColumnMetadata> getColumns(HyenaTableHandle tableHandle)
+    public List<HyenaColumnMetadata> getColumns(HyenaTableHandle tableHandle)
     {
         tableColumns = fetchTableColumns(hyenaSession);
         checkArgument(tableColumns.containsKey(tableHandle.getSchemaTableName()), "Table %s not registered", tableHandle.getSchemaTableName());

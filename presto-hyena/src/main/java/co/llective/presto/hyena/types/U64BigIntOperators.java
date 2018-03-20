@@ -21,10 +21,12 @@ import static co.llective.presto.hyena.types.U64Type.U_64_NAME;
 import static co.llective.presto.hyena.types.U64Type.U_64_TYPE;
 import static com.facebook.presto.spi.function.OperatorType.BETWEEN;
 import static com.facebook.presto.spi.function.OperatorType.CAST;
+import static com.facebook.presto.spi.function.OperatorType.EQUAL;
 import static com.facebook.presto.spi.function.OperatorType.GREATER_THAN;
 import static com.facebook.presto.spi.function.OperatorType.GREATER_THAN_OR_EQUAL;
 import static com.facebook.presto.spi.function.OperatorType.LESS_THAN;
 import static com.facebook.presto.spi.function.OperatorType.LESS_THAN_OR_EQUAL;
+import static com.facebook.presto.spi.function.OperatorType.NOT_EQUAL;
 
 /**
  * Class holding methods for interacting between {@link U64Type} class and BigInt ones.
@@ -46,6 +48,40 @@ public class U64BigIntOperators
     {
         return value;
     }
+
+    /**
+     * Compares {@link U64Type} value to integer (SQL BigInt).
+     * <p>
+     * If long value is negative then result is always false.
+     *
+     * @param left u64 number
+     * @param right integer number
+     * @return Returns info if u64 value is equal to specified long.
+     */
+    @ScalarOperator(EQUAL)
+    @SqlType(StandardTypes.BOOLEAN)
+    public static boolean equalToBigInt(@SqlType(U_64_NAME) long left, @SqlType(StandardTypes.BIGINT) long right)
+    {
+        return U_64_TYPE.compareUnsignedLongs(left, right) == 0;
+    }
+
+
+    /**
+     * Compares {@link U64Type} value to integer (SQL BigInt).
+     * <p>
+     * If long value is negative then result is always false.
+     *
+     * @param left u64 number
+     * @param right integer number
+     * @return Returns info if u64 value is not equal to specified long.
+     */
+    @ScalarOperator(NOT_EQUAL)
+    @SqlType(StandardTypes.BOOLEAN)
+    public static boolean notEqualToBigInt(@SqlType(U_64_NAME) long left, @SqlType(StandardTypes.BIGINT) long right)
+    {
+        return U_64_TYPE.compareUnsignedLongs(left, right) != 0;
+    }
+
 
     /**
      * Compares {@link U64Type} value to long (SQL BigInt).

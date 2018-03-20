@@ -31,6 +31,7 @@ import com.google.common.collect.ImmutableMap;
 
 import javax.inject.Inject;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -73,7 +74,7 @@ public class HyenaMetadata
     public ConnectorTableMetadata getTableMetadata(ConnectorSession session, ConnectorTableHandle table)
     {
         HyenaTableHandle tableHandle = (HyenaTableHandle) table;
-        return new ConnectorTableMetadata(tableHandle.getSchemaTableName(), hyenaTables.getColumns(tableHandle));
+        return new ConnectorTableMetadata(tableHandle.getSchemaTableName(), new ArrayList<>(hyenaTables.getColumns(tableHandle)));
     }
 
     @Override
@@ -108,8 +109,8 @@ public class HyenaMetadata
     {
         ImmutableMap.Builder<String, ColumnHandle> columnHandles = ImmutableMap.builder();
         int index = 0;
-        for (ColumnMetadata column : hyenaTables.getColumns(tableHandle)) {
-            columnHandles.put(column.getName(), new HyenaColumnHandle(column.getName(), column.getType(), index));
+        for (HyenaColumnMetadata column : hyenaTables.getColumns(tableHandle)) {
+            columnHandles.put(column.getName(), new HyenaColumnHandle(column.getName(), column.getType(), column.getBlockType(), index));
             index++;
         }
         return columnHandles.build();
@@ -129,7 +130,9 @@ public class HyenaMetadata
         for (SchemaTableName tableName : listTables(session, prefix)) {
             HyenaTableHandle tableHandle = hyenaTables.getTable(tableName);
             if (tableHandle != null) {
-                columns.put(tableName, hyenaTables.getColumns(tableHandle));
+                //f**** inheritance of generics
+                List<ColumnMetadata> columnsMetadata = new ArrayList<>(hyenaTables.getColumns(tableHandle));
+                columns.put(tableName, columnsMetadata);
             }
         }
         return columns.build();
