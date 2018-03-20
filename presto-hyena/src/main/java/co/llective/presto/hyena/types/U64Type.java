@@ -69,6 +69,44 @@ public final class U64Type
         return compareUnsignedLongs(u64Value, signedValue);
     }
 
+    public long addSignedInt(long u64, int signedInt) {
+        if (signedInt < 0) {
+            return UnsignedLong.fromLongBits(u64).minus(UnsignedLong.fromLongBits((long) Math.abs(signedInt))).longValue();
+        } else {
+            return UnsignedLong.fromLongBits(u64).plus(UnsignedLong.fromLongBits((long) signedInt)).longValue();
+        }
+    }
+
+    public long subtractSignedInt(long u64, int signedInt) {
+        if (signedInt < 0) {
+            return UnsignedLong.fromLongBits(u64).plus(UnsignedLong.fromLongBits((long) Math.abs(signedInt))).longValue();
+        } else {
+            return UnsignedLong.fromLongBits(u64).minus(UnsignedLong.fromLongBits((long) signedInt)).longValue();
+        }
+    }
+
+    public long multiplyBySignedInt(long u64, int signedInt) {
+        if (signedInt < 0) {
+            return -1 * UnsignedLong.fromLongBits(u64).times(UnsignedLong.fromLongBits((long) Math.abs(signedInt))).longValue();
+        } else {
+            return UnsignedLong.fromLongBits(u64).times(UnsignedLong.fromLongBits((long) signedInt)).longValue();
+        }
+    }
+
+    public long divideBySignedInt(long u64, int signedInt) {
+        if (signedInt < 0) {
+            return -1 * UnsignedLong.fromLongBits(u64).dividedBy(UnsignedLong.fromLongBits((long) Math.abs(signedInt))).longValue();
+        } else if (signedInt > 0) {
+            return UnsignedLong.fromLongBits(u64).dividedBy(UnsignedLong.fromLongBits((long) signedInt)).longValue();
+        } else {
+            throw new ArithmeticException("Divide by 0");
+        }
+    }
+
+    public long moduloSignedInt(long u64, int signedInt) {
+        return UnsignedLong.fromLongBits(u64).mod(UnsignedLong.fromLongBits((long) Math.abs(signedInt))).longValue();
+    }
+
     @Override
     public long hash(Block block, int position)
     {

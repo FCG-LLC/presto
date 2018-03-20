@@ -8,14 +8,19 @@ import com.facebook.presto.spi.type.StandardTypes;
 import static co.llective.presto.hyena.types.U64Type.U_64_NAME;
 import static co.llective.presto.hyena.types.U64Type.U_64_TYPE;
 import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
+import static com.facebook.presto.spi.function.OperatorType.ADD;
 import static com.facebook.presto.spi.function.OperatorType.BETWEEN;
 import static com.facebook.presto.spi.function.OperatorType.CAST;
+import static com.facebook.presto.spi.function.OperatorType.DIVIDE;
 import static com.facebook.presto.spi.function.OperatorType.EQUAL;
 import static com.facebook.presto.spi.function.OperatorType.GREATER_THAN;
 import static com.facebook.presto.spi.function.OperatorType.GREATER_THAN_OR_EQUAL;
 import static com.facebook.presto.spi.function.OperatorType.LESS_THAN;
 import static com.facebook.presto.spi.function.OperatorType.LESS_THAN_OR_EQUAL;
+import static com.facebook.presto.spi.function.OperatorType.MODULUS;
+import static com.facebook.presto.spi.function.OperatorType.MULTIPLY;
 import static com.facebook.presto.spi.function.OperatorType.NOT_EQUAL;
+import static com.facebook.presto.spi.function.OperatorType.SUBTRACT;
 import static java.lang.Math.toIntExact;
 
 public class U64IntOperators
@@ -154,5 +159,35 @@ public class U64IntOperators
     {
         return greaterThanOrEqualInteger(value, min)
                 && lessThanOrEqualInteger(value, max);
+    }
+
+    @ScalarOperator(ADD)
+    @SqlType(U_64_NAME)
+    public static long add(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer) {
+        return U_64_TYPE.addSignedInt(u64, (int) integer);
+    }
+
+    @ScalarOperator(SUBTRACT)
+    @SqlType(U_64_NAME)
+    public static long subtract(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer) {
+        return U_64_TYPE.subtractSignedInt(u64, (int) integer);
+    }
+
+    @ScalarOperator(MULTIPLY)
+    @SqlType(U_64_NAME)
+    public static long multiply(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer) {
+        return U_64_TYPE.multiplyBySignedInt(u64, (int) integer);
+    }
+
+    @ScalarOperator(DIVIDE)
+    @SqlType(U_64_NAME)
+    public static long divide(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer) {
+        return U_64_TYPE.divideBySignedInt(u64, (int) integer);
+    }
+
+    @ScalarOperator(MODULUS)
+    @SqlType(U_64_NAME)
+    public static long modulus(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer) {
+        return U_64_TYPE.moduloSignedInt(u64, (int) integer);
     }
 }
