@@ -65,7 +65,6 @@ public class U64BigIntOperators
         return U_64_TYPE.compareUnsignedLongs(left, right) == 0;
     }
 
-
     /**
      * Compares {@link U64Type} value to integer (SQL BigInt).
      * <p>
@@ -81,7 +80,6 @@ public class U64BigIntOperators
     {
         return U_64_TYPE.compareUnsignedLongs(left, right) != 0;
     }
-
 
     /**
      * Compares {@link U64Type} value to long (SQL BigInt).

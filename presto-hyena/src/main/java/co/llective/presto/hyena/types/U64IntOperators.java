@@ -1,3 +1,16 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package co.llective.presto.hyena.types;
 
 import com.facebook.presto.spi.PrestoException;
@@ -163,31 +176,36 @@ public class U64IntOperators
 
     @ScalarOperator(ADD)
     @SqlType(U_64_NAME)
-    public static long add(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer) {
+    public static long add(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer)
+    {
         return U_64_TYPE.addSignedInt(u64, (int) integer);
     }
 
     @ScalarOperator(SUBTRACT)
     @SqlType(U_64_NAME)
-    public static long subtract(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer) {
+    public static long subtract(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer)
+    {
         return U_64_TYPE.subtractSignedInt(u64, (int) integer);
     }
 
     @ScalarOperator(MULTIPLY)
     @SqlType(U_64_NAME)
-    public static long multiply(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer) {
+    public static long multiply(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer)
+    {
         return U_64_TYPE.multiplyBySignedInt(u64, (int) integer);
     }
 
     @ScalarOperator(DIVIDE)
     @SqlType(U_64_NAME)
-    public static long divide(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer) {
+    public static long divide(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer)
+    {
         return U_64_TYPE.divideBySignedInt(u64, (int) integer);
     }
 
     @ScalarOperator(MODULUS)
     @SqlType(U_64_NAME)
-    public static long modulus(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer) {
+    public static long modulus(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer)
+    {
         return U_64_TYPE.moduloSignedInt(u64, (int) integer);
     }
 }
