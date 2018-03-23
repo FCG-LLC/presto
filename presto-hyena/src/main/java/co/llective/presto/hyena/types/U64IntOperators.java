@@ -178,34 +178,59 @@ public class U64IntOperators
     @SqlType(U_64_NAME)
     public static long add(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer)
     {
-        return U_64_TYPE.addSignedInt(u64, (int) integer);
+        try {
+            return U_64_TYPE.addSignedInt(u64, (int) integer);
+        }
+        catch (ArithmeticException exc) {
+            throw new PrestoException(NUMERIC_VALUE_OUT_OF_RANGE, exc.getMessage(), exc);
+        }
     }
 
     @ScalarOperator(SUBTRACT)
     @SqlType(U_64_NAME)
     public static long subtract(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer)
     {
-        return U_64_TYPE.subtractSignedInt(u64, (int) integer);
+        try {
+            return U_64_TYPE.subtractSignedInt(u64, (int) integer);
+        }
+        catch (ArithmeticException exc) {
+            throw new PrestoException(NUMERIC_VALUE_OUT_OF_RANGE, exc.getMessage(), exc);
+        }
     }
 
     @ScalarOperator(MULTIPLY)
     @SqlType(U_64_NAME)
     public static long multiply(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer)
     {
-        return U_64_TYPE.multiplyBySignedInt(u64, (int) integer);
+        try {
+            return U_64_TYPE.multiplyBySignedInt(u64, (int) integer);
+        }
+        catch (ArithmeticException exc) {
+            throw new PrestoException(NUMERIC_VALUE_OUT_OF_RANGE, exc.getMessage(), exc);
+        }
     }
 
     @ScalarOperator(DIVIDE)
     @SqlType(U_64_NAME)
     public static long divide(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer)
     {
-        return U_64_TYPE.divideBySignedInt(u64, (int) integer);
+        try {
+            return U_64_TYPE.divideBySignedInt(u64, (int) integer);
+        }
+        catch (ArithmeticException exc) {
+            throw new PrestoException(NUMERIC_VALUE_OUT_OF_RANGE, exc.getMessage(), exc);
+        }
     }
 
     @ScalarOperator(MODULUS)
     @SqlType(U_64_NAME)
     public static long modulus(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.INTEGER) long integer)
     {
-        return U_64_TYPE.moduloSignedInt(u64, (int) integer);
+        try {
+            return U_64_TYPE.moduloSignedInt(u64, (int) integer);
+        }
+        catch (ArithmeticException exc) {
+            throw new PrestoException(NUMERIC_VALUE_OUT_OF_RANGE, exc.getMessage(), exc);
+        }
     }
 }
