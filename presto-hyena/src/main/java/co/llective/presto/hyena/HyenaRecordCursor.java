@@ -204,9 +204,17 @@ public class HyenaRecordCursor
             return 0;
         }
 
+        Optional<Long> sourceIdPosition = columns.stream().filter(x -> x.getColumnName().equals("source_id")).findFirst().map(
+                HyenaColumnHandle::getOrdinalPosition);
+
         return result.getData().stream()
                 //TODO: Hyena doesn't support source_id column properly yet
-                .filter(x -> !columns.get(((Long) x.getColumnId()).intValue()).getColumnName().equals("source_id"))
+                .filter(triple -> {
+                    if (sourceIdPosition.isPresent()) {
+                        return triple.getColumnId() != sourceIdPosition.get();
+                    }
+                    return true;
+                })
                 //if dense block
                 .filter(x -> x.getColumnType().isDense())
                 .map(dt -> dt.getData().map(bh -> bh.getBlock().count()).orElse(0))
@@ -215,7 +223,12 @@ public class HyenaRecordCursor
                 .orElseGet(() ->
                         result.getData().stream()
                                 //TODO: Hyena doesn't support source_id column properly yet
-                                .filter(x -> !columns.get(((Long) x.getColumnId()).intValue()).getColumnName().equals("source_id"))
+                                .filter(triple -> {
+                                    if (sourceIdPosition.isPresent()) {
+                                        return triple.getColumnId() != sourceIdPosition.get();
+                                    }
+                                    return true;
+                                })
                                 .map(dt -> dt.getData().map(bh -> {
                                     List<Integer> offsets = ((SparseBlock) bh.getBlock()).getOffsetData();
                                     // last element of offset shows last non-null element of row
