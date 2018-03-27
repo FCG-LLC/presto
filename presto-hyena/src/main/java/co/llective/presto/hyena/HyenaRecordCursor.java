@@ -193,9 +193,48 @@ public class HyenaRecordCursor
 
         log.info("Filters: " + StringUtils.join(req.getFilters(), ", "));
 
+        //TODO: Remove when hyena will fully support source_id
+        remapSourceIdFilter(req);
+
         result = this.hyenaSession.scan(req);
 
         rowCount = getRowCount(result);
+    }
+
+    void remapSourceIdFilter(ScanRequest req)
+    {
+        Optional<Long> sourceIdPosition = columns.stream()
+                .filter(x -> x.getColumnName().equals("source_id"))
+                .findFirst()
+                .map(HyenaColumnHandle::getOrdinalPosition);
+
+        // if there isn't source_id in this query context it won't be in filters
+        if (!sourceIdPosition.isPresent()) {
+            return;
+        }
+
+        // if there is not filters
+        if (req.getFilters().size() == 0) {
+            return;
+        }
+
+        // if there are filters but none of them is source_id one
+        if (req.getFilters().stream().allMatch(filter -> filter.getColumn() != sourceIdPosition.get())) {
+            return;
+        }
+
+        if (req.getFilters().size() == 1) {
+            req.getFilters().removeIf(x -> x.getColumn() == sourceIdPosition.get());
+            // add tautology filter, u64 > 0
+            long timestampIndex = 0L;
+            if (!req.getProjection().contains(timestampIndex)) {
+                req.getProjection().add(timestampIndex);
+            }
+            req.getFilters().add(new ScanFilter(0, ScanComparison.Gt, BlockType.U64Dense.mapToFilterType(), timestampIndex, Optional.empty()));
+        }
+        else {
+            req.getFilters().removeIf(x -> x.getColumn() == sourceIdPosition.get());
+        }
     }
 
     int getRowCount(ScanResult result)
