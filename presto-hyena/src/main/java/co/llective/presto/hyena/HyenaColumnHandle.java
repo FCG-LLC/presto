@@ -59,7 +59,8 @@ public class HyenaColumnHandle
     }
 
     @JsonProperty
-    public BlockType getHyenaType() {
+    public BlockType getHyenaType()
+    {
         return hyenaType;
     }
 
