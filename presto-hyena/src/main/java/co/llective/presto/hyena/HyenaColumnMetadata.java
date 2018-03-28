@@ -22,14 +22,9 @@ public class HyenaColumnMetadata
 {
     private BlockType blockType;
 
-    public HyenaColumnMetadata(String name, Type type)
-    {
-        super(name, type);
-    }
-
     public HyenaColumnMetadata(String name, Type type, BlockType blockType)
     {
-        this(name, type);
+        super(name, type, null, blockType.toString(), false);
         this.blockType = blockType;
     }
 
