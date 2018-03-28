@@ -13,6 +13,7 @@
  */
 package co.llective.presto.hyena.types;
 
+import com.facebook.presto.spi.function.ScalarFunction;
 import com.facebook.presto.spi.function.ScalarOperator;
 import com.facebook.presto.spi.function.SqlType;
 import com.facebook.presto.spi.type.AbstractLongType;
@@ -81,6 +82,13 @@ public final class U64Operators
     {
         return U_64_TYPE.compareUnsignedLongs(min, value) <= 0
                 && U_64_TYPE.compareUnsignedLongs(value, max) <= 0;
+    }
+
+    @ScalarFunction("floor")
+    @SqlType(U_64_NAME)
+    public static long floorToU64(@SqlType(U_64_NAME) long u64)
+    {
+        return u64;
     }
 
     @ScalarOperator(HASH_CODE)
