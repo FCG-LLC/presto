@@ -16,7 +16,6 @@ package co.llective.presto.hyena;
 import co.llective.hyena.api.Block;
 import co.llective.hyena.api.BlockHolder;
 import co.llective.hyena.api.BlockType;
-import co.llective.hyena.api.Catalog;
 import co.llective.hyena.api.DataTriple;
 import co.llective.hyena.api.DenseBlock;
 import co.llective.hyena.api.ScanComparison;
@@ -59,9 +58,9 @@ public class HyenaRecordCursor
     private int rowPosition = -1; // presto first advances next row and then fetch data
     private final int rowCount;
 
-    public HyenaRecordCursor(Catalog catalog, HyenaSession hyenaSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
+    public HyenaRecordCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
     {
-        this(new HyenaPredicatesUtil(catalog), hyenaSession, columns, predicate);
+        this(new HyenaPredicatesUtil(), hyenaSession, columns, predicate);
     }
 
     public HyenaRecordCursor(HyenaPredicatesUtil predicateHandler, HyenaSession hyenaSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
