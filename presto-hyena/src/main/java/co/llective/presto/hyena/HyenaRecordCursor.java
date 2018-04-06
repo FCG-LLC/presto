@@ -62,6 +62,13 @@ public class HyenaRecordCursor
 
     private Map<Integer, BlockHolder> fieldToBlockHolders = new HashMap<>();
 
+    private long constructorStart;
+    private long constructorFinish;
+    private long scanStart;
+    private long scanFinish;
+    private long iteratingStart;
+    private long iteratingFinished;
+
     public HyenaRecordCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
     {
         this(new HyenaPredicatesUtil(), hyenaSession, columns, predicate);
@@ -69,6 +76,7 @@ public class HyenaRecordCursor
 
     public HyenaRecordCursor(HyenaPredicatesUtil predicateHandler, HyenaSession hyenaSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
     {
+        constructorStart = System.currentTimeMillis();
         this.columns = requireNonNull(columns, "columns is null");
 
         ScanRequest req = new ScanRequest();
@@ -89,9 +97,14 @@ public class HyenaRecordCursor
         //TODO: Remove when hyena will fully support source_id
         remapSourceIdFilter(req);
 
+        scanStart = System.currentTimeMillis();
         result = hyenaSession.scan(req);
+        scanFinish = System.currentTimeMillis();
         rowCount = getRowCount(result);
         prepareBlockHolderMappings();
+
+        log.info("Received " + rowCount + " records");
+        constructorFinish = System.currentTimeMillis();
     }
 
     private void prepareBlockHolderMappings()
@@ -206,6 +219,12 @@ public class HyenaRecordCursor
     @Override
     public boolean advanceNextPosition()
     {
+        if (rowPosition == -1) {
+            iteratingStart = System.currentTimeMillis();
+        }
+        else if (rowPosition == (rowCount - 1)) {
+            iteratingFinished = System.currentTimeMillis();
+        }
         return ++rowPosition < rowCount;
     }
 
@@ -340,6 +359,11 @@ public class HyenaRecordCursor
     @Override
     public void close()
     {
+        long closeTime = System.currentTimeMillis();
+        log.warn("Scan + deserialization time: " + (scanFinish - scanStart) + "ms");
+        log.warn("Constructor time: " + (constructorFinish - constructorStart) + "ms");
+        log.warn("Iterating time: " + (iteratingFinished - iteratingStart) + "ms");
+        log.warn("Whole cursor job: " + (closeTime - constructorStart) + "ms");
         //TODO: cancel query in hyenaAPI (send abort request with requestID)
     }
 }
