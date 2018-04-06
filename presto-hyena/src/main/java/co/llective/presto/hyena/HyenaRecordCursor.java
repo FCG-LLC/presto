@@ -18,25 +18,17 @@ import co.llective.hyena.api.BlockHolder;
 import co.llective.hyena.api.BlockType;
 import co.llective.hyena.api.DataTriple;
 import co.llective.hyena.api.DenseBlock;
-import co.llective.hyena.api.FilterType;
 import co.llective.hyena.api.ScanComparison;
 import co.llective.hyena.api.ScanFilter;
-import co.llective.hyena.api.ScanFilterBuilder;
 import co.llective.hyena.api.ScanRequest;
 import co.llective.hyena.api.ScanResult;
 import co.llective.hyena.api.SparseBlock;
 import co.llective.hyena.api.StringBlock;
 import co.llective.presto.hyena.types.U64Type;
-import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.RecordCursor;
-import com.facebook.presto.spi.predicate.Domain;
-import com.facebook.presto.spi.predicate.Marker;
-import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.Type;
 import com.google.common.base.Joiner;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.primitives.UnsignedLong;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import org.apache.commons.lang3.StringUtils;
@@ -46,13 +38,11 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
-import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.slice.Slices.utf8Slice;
 import static java.lang.String.format;
@@ -64,15 +54,17 @@ public class HyenaRecordCursor
     private static final Logger log = Logger.get(HyenaRecordCursor.class);
 
     private final List<HyenaColumnHandle> columns;
-    private final HyenaSession hyenaSession;
-
     private final ScanResult result;
     private int rowPosition = -1; // presto first advances next row and then fetch data
     private final int rowCount;
 
-    public HyenaRecordCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, HostAddress address, TupleDomain<HyenaColumnHandle> predicate)
+    public HyenaRecordCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
     {
-        this.hyenaSession = requireNonNull(hyenaSession, "hyenaSession is null");
+        this(new HyenaPredicatesUtil(), hyenaSession, columns, predicate);
+    }
+
+    public HyenaRecordCursor(HyenaPredicatesUtil predicateHandler, HyenaSession hyenaSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
+    {
         this.columns = requireNonNull(columns, "columns is null");
 
         ScanRequest req = new ScanRequest();
@@ -85,119 +77,15 @@ public class HyenaRecordCursor
             req.getProjection().add(col.getOrdinalPosition());
         }
 
-        if (predicate.getColumnDomains().isPresent()) {
-            List<TupleDomain.ColumnDomain<HyenaColumnHandle>> handles = predicate.getColumnDomains().get();
-            for (TupleDomain.ColumnDomain<HyenaColumnHandle> handle : handles) {
-                Domain domain = handle.getDomain();
-                HyenaColumnHandle column = handle.getColumn();
-
-                Set<Object> values = domain.getValues().getValuesProcessor().transform(
-                        ranges -> {
-                            ImmutableSet.Builder<Object> columnValues = ImmutableSet.builder();
-                            for (Range range : ranges.getOrderedRanges()) {
-                                if (range.isSingleValue()) {
-                                    if (column.getColumnType() == VARCHAR) {
-                                        Slice val = (Slice) range.getSingleValue();
-                                        req.getFilters().add(new ScanFilter(column.getOrdinalPosition(), ScanComparison.Eq, FilterType.String, val, Optional.of(val.toStringUtf8())));
-                                    }
-                                    else {
-                                        Long val = (Long) range.getSingleValue();
-                                        req.getFilters().add(new ScanFilter(column.getOrdinalPosition(), ScanComparison.Eq, column.getHyenaType().mapToFilterType(), val, Optional.of("")));
-                                    }
-                                }
-                                else {
-                                    if (range.getHigh().getValueBlock().isPresent()) {
-                                        Marker high = range.getHigh();
-
-                                        ScanFilterBuilder builder = new ScanFilterBuilder(hyenaSession.refreshCatalog()).withColumn(column.getOrdinalPosition());
-
-                                        if (high.getBound() == Marker.Bound.BELOW) {
-                                            builder = builder.withOp(ScanComparison.Lt);
-                                        }
-                                        else if (high.getBound() == Marker.Bound.EXACTLY) {
-                                            builder = builder.withOp(ScanComparison.LtEq);
-                                        }
-                                        else {
-                                            throw new UnsupportedOperationException("We don't know how to handle this yet - high values and neither below nor exactly marker present?");
-                                        }
-
-                                        if (column.getColumnType() == VARCHAR) {
-                                            builder = builder.withStringValue(((Slice) high.getValue()).toStringUtf8());
-                                        }
-                                        else if (column.getColumnType() == U64Type.U_64_TYPE) {
-                                            //TODO: replace with proper handling of U64 filters
-                                            Long value = (Long) high.getValue();
-                                            if (value < 0) {
-                                                builder = builder.withOp(ScanComparison.Gt);
-                                                builder = builder.withValue(UnsignedLong.MAX_VALUE.longValue());
-                                            }
-                                            else {
-                                                builder = builder.withValue(value);
-                                            }
-                                        }
-                                        else {
-                                            builder = builder.withValue((Long) high.getValue());
-                                        }
-
-                                        req.getFilters().add(builder.build());
-                                    }
-
-                                    if (range.getLow().getValueBlock().isPresent()) {
-                                        ScanFilterBuilder builder = new ScanFilterBuilder(hyenaSession.refreshCatalog()).withColumn(column.getOrdinalPosition());
-
-                                        Marker low = range.getLow();
-
-                                        if (low.getBound() == Marker.Bound.ABOVE) {
-                                            builder = builder.withOp(ScanComparison.Gt);
-                                        }
-                                        else if (low.getBound() == Marker.Bound.EXACTLY) {
-                                            builder = builder.withOp(ScanComparison.GtEq);
-                                        }
-                                        else {
-                                            throw new UnsupportedOperationException("We don't know how to handle this yet - low values and neither above nor exactly marker present?");
-                                        }
-
-                                        if (column.getColumnType() == VARCHAR) {
-                                            builder = builder.withStringValue(((Slice) low.getValue()).toStringUtf8());
-                                        }
-                                        else if (column.getColumnType() == U64Type.U_64_TYPE) {
-                                            //TODO: replace with proper handling of U64 filters
-                                            Long value = (Long) low.getValue();
-                                            if (value < 0) {
-                                                builder = builder.withOp(ScanComparison.GtEq);
-                                                builder = builder.withValue(UnsignedLong.ZERO.longValue());
-                                            }
-                                            else {
-                                                builder = builder.withValue(value);
-                                            }
-                                        }
-                                        else {
-                                            builder = builder.withValue((Long) low.getValue());
-                                        }
-
-                                        req.getFilters().add(builder.build());
-                                    }
-                                }
-                            }
-                            return columnValues.build();
-                        },
-                        discreteValues -> {
-                            if (discreteValues.isWhiteList()) {
-                                return ImmutableSet.copyOf(discreteValues.getValues());
-                            }
-                            return ImmutableSet.of();
-                        },
-                        allOrNone -> ImmutableSet.of());
-            }
-        }
+        List<ScanFilter> filters = predicateHandler.predicateToFilters(predicate);
+        req.getFilters().addAll(filters);
 
         log.info("Filters: " + StringUtils.join(req.getFilters(), ", "));
 
         //TODO: Remove when hyena will fully support source_id
         remapSourceIdFilter(req);
 
-        result = this.hyenaSession.scan(req);
-
+        result = hyenaSession.scan(req);
         rowCount = getRowCount(result);
     }
 
