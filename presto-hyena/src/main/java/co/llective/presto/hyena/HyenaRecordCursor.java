@@ -36,7 +36,9 @@ import org.apache.commons.lang3.StringUtils;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
@@ -57,6 +59,8 @@ public class HyenaRecordCursor
     private final ScanResult result;
     private int rowPosition = -1; // presto first advances next row and then fetch data
     private final int rowCount;
+
+    private Map<Integer, BlockHolder> fieldToBlockHolders = new HashMap<>();
 
     public HyenaRecordCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
     {
@@ -87,6 +91,21 @@ public class HyenaRecordCursor
 
         result = hyenaSession.scan(req);
         rowCount = getRowCount(result);
+        prepareBlockHolderMappings();
+    }
+
+    private void prepareBlockHolderMappings()
+    {
+        for (int field = 0; field < columns.size(); field++) {
+            long columnId = columns.get(field).getOrdinalPosition();
+            Optional<BlockHolder> optBlockHolder = this.result.getData().stream()
+                    .filter(triple -> triple.getColumnId() == columnId)
+                    .map(DataTriple::getData)
+                    .findFirst().orElse(Optional.empty());
+            if (optBlockHolder.isPresent()) {
+                fieldToBlockHolders.put(field, optBlockHolder.get());
+            }
+        }
     }
 
     void remapSourceIdFilter(ScanRequest req)
@@ -298,17 +317,12 @@ public class HyenaRecordCursor
 
     private BlockHolder getBlockHolderOrThrow(int field)
     {
-        long columnId = columns.get(field).getOrdinalPosition();
-        Optional<BlockHolder> optionalHolder = this.result.getData().stream()
-                .filter(triple -> triple.getColumnId() == columnId)
-                .map(DataTriple::getData)
-                .findFirst().orElse(Optional.empty());
+        BlockHolder blockHolder = fieldToBlockHolders.get(field);
 
-        if (!optionalHolder.isPresent()) {
+        if (blockHolder == null) {
             throw new RuntimeException("Empty block holder");
         }
-
-        return optionalHolder.get();
+        return blockHolder;
     }
 
     private void checkFieldType(int field, Type... expected)
