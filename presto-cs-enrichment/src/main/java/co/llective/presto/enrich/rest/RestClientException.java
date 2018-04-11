@@ -1,4 +1,4 @@
-package co.llective.presto.enrich.username;
+package co.llective.presto.enrich.rest;
 
 public class RestClientException
         extends Exception

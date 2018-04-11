@@ -1,4 +1,4 @@
-package co.llective.presto.enrich.username;
+package co.llective.presto.enrich.util;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -129,18 +129,18 @@ public final class IpUtil
         private long highBits;
         private long lowBits;
 
-        IpPair(long highBits, long lowBits)
+        public IpPair(long highBits, long lowBits)
         {
             this.highBits = highBits;
             this.lowBits = lowBits;
         }
 
-        long getHighBits()
+        public long getHighBits()
         {
             return highBits;
         }
 
-        long getLowBits()
+        public long getLowBits()
         {
             return lowBits;
         }

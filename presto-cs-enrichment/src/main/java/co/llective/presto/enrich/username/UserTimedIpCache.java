@@ -1,5 +1,7 @@
 package co.llective.presto.enrich.username;
 
+import co.llective.presto.enrich.util.TimedIpCache;
+
 import java.util.HashMap;
 import java.util.Map;
 

@@ -1,5 +1,6 @@
 package co.llective.presto.enrich.username;
 
+import co.llective.presto.enrich.util.TimedIpCache;
 import io.airlift.log.Logger;
 
 import java.util.Comparator;

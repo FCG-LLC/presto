@@ -1,5 +1,6 @@
 package co.llective.presto.enrich.username;
 
+import co.llective.presto.enrich.util.IpUtil;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 import java.util.List;

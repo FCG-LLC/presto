@@ -1,5 +1,7 @@
 package co.llective.presto.enrich.username;
 
+import co.llective.presto.enrich.rest.RestClient;
+import co.llective.presto.enrich.rest.RestClientException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.airlift.log.Logger;
 
@@ -60,8 +62,7 @@ public class UserCacheFetcher
         }
     }
 
-    private List<EnrichedUser> deserializeResponseJson(String json)
-            throws CacheException
+    private List<EnrichedUser> deserializeResponseJson(String json) throws CacheException
     {
         try {
             ObjectMapper objectMapper = new ObjectMapper();
