@@ -1,5 +1,7 @@
 package co.llective.presto.enrich.username;
 
+import com.google.common.annotations.VisibleForTesting;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -132,5 +134,17 @@ public class TimeUserCache
         else {
             return timestampBisect(timestamp, middleIndex, maxIndex);
         }
+    }
+
+    @VisibleForTesting
+    List<Long> getTimestamps()
+    {
+        return timestamps;
+    }
+
+    @VisibleForTesting
+    List<String> getUsers()
+    {
+        return users;
     }
 }

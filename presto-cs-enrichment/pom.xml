@@ -79,6 +79,13 @@
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-hyena</artifactId>
         </dependency>
+
+        <!-- tests -->
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <!-- disable apache-2.0 for cs module -->
