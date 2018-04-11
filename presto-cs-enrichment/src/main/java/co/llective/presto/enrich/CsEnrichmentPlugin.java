@@ -1,5 +1,6 @@
 package co.llective.presto.enrich;
 
+import co.llective.presto.enrich.username.UserNameFunction;
 import com.facebook.presto.spi.Plugin;
 
 import java.util.HashSet;
