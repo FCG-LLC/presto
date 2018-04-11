@@ -6,6 +6,7 @@ import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Objects;
 
 public final class IpUtil
 {
@@ -154,6 +155,22 @@ public final class IpUtil
         {
             String ip = ip4ToString(this);
             return ip == null ? ip6ToString(this) : ip;
+        }
+
+        @Override
+        public boolean equals(Object o)
+        {
+            if (this == o) { return true; }
+            if (o == null || getClass() != o.getClass()) { return false; }
+            IpPair ipPair = (IpPair) o;
+            return highBits == ipPair.highBits &&
+                    lowBits == ipPair.lowBits;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(highBits, lowBits);
         }
     }
 

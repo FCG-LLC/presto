@@ -4,6 +4,7 @@ import co.llective.presto.enrich.util.IpUtil;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 import java.util.List;
+import java.util.Objects;
 
 class EnrichedUser
 {
@@ -38,6 +39,24 @@ class EnrichedUser
     public String getUser()
     {
         return user;
+    }
+
+    @Override
+    public boolean equals(Object o)
+    {
+        if (this == o) { return true; }
+        if (o == null || getClass() != o.getClass()) { return false; }
+        EnrichedUser that = (EnrichedUser) o;
+        return Objects.equals(startTs, that.startTs) &&
+                Objects.equals(endTs, that.endTs) &&
+                Objects.equals(ip, that.ip) &&
+                Objects.equals(user, that.user);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(startTs, endTs, ip, user);
     }
 
     @JsonDeserialize(using = EnrichedUsersDeserializer.class)
