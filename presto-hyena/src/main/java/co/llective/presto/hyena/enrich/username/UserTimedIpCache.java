@@ -1,6 +1,6 @@
-package co.llective.presto.enrich.username;
+package co.llective.presto.hyena.enrich.username;
 
-import co.llective.presto.enrich.util.TimedIpCache;
+import co.llective.presto.hyena.enrich.util.TimedIpCache;
 import com.google.common.annotations.VisibleForTesting;
 
 import java.util.HashMap;

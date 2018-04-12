@@ -1,4 +1,4 @@
-package co.llective.presto.enrich.util;
+package co.llective.presto.hyena.enrich.util;
 
 public interface TimedIpCache<T>
 {

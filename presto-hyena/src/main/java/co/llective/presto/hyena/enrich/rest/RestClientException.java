@@ -1,4 +1,4 @@
-package co.llective.presto.enrich.rest;
+package co.llective.presto.hyena.enrich.rest;
 
 public class RestClientException
         extends Exception

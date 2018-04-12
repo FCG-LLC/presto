@@ -1,4 +1,4 @@
-package co.llective.presto.enrich.util;
+package co.llective.presto.hyena.enrich.util;
 
 import org.apache.commons.lang3.StringUtils;
 

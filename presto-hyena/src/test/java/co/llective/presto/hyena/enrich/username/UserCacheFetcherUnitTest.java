@@ -1,7 +1,7 @@
-package co.llective.presto.enrich.username;
+package co.llective.presto.hyena.enrich.username;
 
-import co.llective.presto.enrich.rest.RestClient;
-import co.llective.presto.enrich.rest.RestClientException;
+import co.llective.presto.hyena.enrich.rest.RestClient;
+import co.llective.presto.hyena.enrich.rest.RestClientException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;

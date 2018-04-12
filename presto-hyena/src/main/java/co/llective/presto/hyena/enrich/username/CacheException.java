@@ -1,4 +1,4 @@
-package co.llective.presto.enrich.username;
+package co.llective.presto.hyena.enrich.username;
 
 public class CacheException
         extends Exception

@@ -1,4 +1,4 @@
-package co.llective.presto.enrich.username;
+package co.llective.presto.hyena.enrich.username;
 
 import com.google.common.annotations.VisibleForTesting;
 

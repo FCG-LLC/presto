@@ -135,7 +135,6 @@
         <module>presto-thrift-connector</module>
         <module>presto-matching</module>
         <module>presto-hyena</module>
-        <module>presto-cs-enrichment</module>
     </modules>
 
     <dependencyManagement>
@@ -193,12 +192,6 @@
             <dependency>
                 <groupId>com.facebook.presto</groupId>
                 <artifactId>presto-hyena</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.facebook.presto</groupId>
-                <artifactId>presto-cs-enrichment</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

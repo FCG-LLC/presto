@@ -13,6 +13,7 @@
  */
 package co.llective.presto.hyena;
 
+import co.llective.presto.hyena.enrich.username.UserNameFunction;
 import co.llective.presto.hyena.types.U64BigIntOperators;
 import co.llective.presto.hyena.types.U64IntOperators;
 import co.llective.presto.hyena.types.U64Operators;
@@ -48,6 +49,7 @@ public class HyenaPlugin
                 .add(U64Operators.class)
                 .add(U64BigIntOperators.class)
                 .add(U64IntOperators.class)
+                .add(UserNameFunction.class)
                 .build();
     }
 }

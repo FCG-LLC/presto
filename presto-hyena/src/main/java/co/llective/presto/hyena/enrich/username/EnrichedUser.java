@@ -1,6 +1,6 @@
-package co.llective.presto.enrich.username;
+package co.llective.presto.hyena.enrich.username;
 
-import co.llective.presto.enrich.util.IpUtil;
+import co.llective.presto.hyena.enrich.util.IpUtil;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 import java.util.List;

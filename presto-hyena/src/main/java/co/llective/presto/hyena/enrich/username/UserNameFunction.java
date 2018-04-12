@@ -1,4 +1,4 @@
-package co.llective.presto.enrich.username;
+package co.llective.presto.hyena.enrich.username;
 
 import co.llective.presto.hyena.types.U64Type;
 import com.facebook.presto.spi.function.Description;

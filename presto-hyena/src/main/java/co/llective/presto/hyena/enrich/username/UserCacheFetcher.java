@@ -1,7 +1,7 @@
-package co.llective.presto.enrich.username;
+package co.llective.presto.hyena.enrich.username;
 
-import co.llective.presto.enrich.rest.RestClient;
-import co.llective.presto.enrich.rest.RestClientException;
+import co.llective.presto.hyena.enrich.rest.RestClient;
+import co.llective.presto.hyena.enrich.rest.RestClientException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import io.airlift.log.Logger;
@@ -13,8 +13,7 @@ public class UserCacheFetcher
         implements Runnable
 {
     private static final Logger log = Logger.get(UserCacheFetcher.class);
-//    private static final String DE_ENDPOINT = "http://data-enrichment:8888/ip-user";
-    private static final String DE_ENDPOINT = "http://localhost:8888/ip-user";
+    private static final String DE_ENDPOINT = "http://data-enrichment:8888/ip-user";
 
     private final UserNameCache cache;
     private final RestClient restClient;

@@ -1,4 +1,4 @@
-package co.llective.presto.enrich.username;
+package co.llective.presto.hyena.enrich.username;
 
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;

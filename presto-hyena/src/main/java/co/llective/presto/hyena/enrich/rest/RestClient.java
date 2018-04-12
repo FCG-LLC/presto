@@ -1,4 +1,4 @@
-package co.llective.presto.enrich.rest;
+package co.llective.presto.hyena.enrich.rest;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
