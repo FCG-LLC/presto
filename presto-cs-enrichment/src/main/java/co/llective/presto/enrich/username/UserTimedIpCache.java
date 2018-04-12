@@ -1,6 +1,7 @@
 package co.llective.presto.enrich.username;
 
 import co.llective.presto.enrich.util.TimedIpCache;
+import com.google.common.annotations.VisibleForTesting;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -33,5 +34,11 @@ public class UserTimedIpCache
         Map<Long, TimeUserCache> ip1Cache = cache.computeIfAbsent(ip1, k -> new HashMap<>());
         TimeUserCache timedUserCache = ip1Cache.computeIfAbsent(ip2, k -> new TimeUserCache());
         timedUserCache.addNextUser(startTs, endTs, userName);
+    }
+
+    @VisibleForTesting
+    public Map<Long, Map<Long, TimeUserCache>> getCache()
+    {
+        return cache;
     }
 }
