@@ -21,7 +21,8 @@ public class TimeUserCacheUnitTest
         TimeUserCache timeUserCache;
 
         @BeforeMethod
-        public void setUp() {
+        public void setUp()
+        {
             timeUserCache = new TimeUserCache();
         }
 
@@ -78,7 +79,8 @@ public class TimeUserCacheUnitTest
         TimeUserCache timeUserCache;
 
         @BeforeMethod
-        public void setUp() {
+        public void setUp()
+        {
             timeUserCache = new TimeUserCache();
         }
 

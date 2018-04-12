@@ -44,8 +44,12 @@ class EnrichedUser
     @Override
     public boolean equals(Object o)
     {
-        if (this == o) { return true; }
-        if (o == null || getClass() != o.getClass()) { return false; }
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         EnrichedUser that = (EnrichedUser) o;
         return Objects.equals(startTs, that.startTs) &&
                 Objects.equals(endTs, that.endTs) &&

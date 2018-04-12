@@ -13,7 +13,8 @@ import static org.testng.Assert.assertNull;
 
 public class UserTimedIpCacheUnitTest
 {
-    public static class Get {
+    public static class Get
+    {
         private static final Long IP_1 = 1L;
         private static final Long IP_2 = 2L;
         private static final Long TIMESTAMP = 3L;
@@ -24,7 +25,8 @@ public class UserTimedIpCacheUnitTest
         private UserTimedIpCache userTimedIpCache;
 
         @BeforeMethod
-        public void setUp() {
+        public void setUp()
+        {
             userTimedIpCache = new UserTimedIpCache();
             Map<Long, Map<Long, TimeUserCache>> internalCache = userTimedIpCache.getCache();
 
@@ -36,19 +38,22 @@ public class UserTimedIpCacheUnitTest
         }
 
         @Test
-        public void returnsNullIfNoIp1InCache() {
+        public void returnsNullIfNoIp1InCache()
+        {
             String result = userTimedIpCache.get(NON_EXISTING_IP_1, IP_2, TIMESTAMP);
             assertNull(result);
         }
 
         @Test
-        public void returnsNullIfNoIp2InCache() {
+        public void returnsNullIfNoIp2InCache()
+        {
             String result = userTimedIpCache.get(IP_1, NON_EXISTING_IP_2, TIMESTAMP);
             assertNull(result);
         }
 
         @Test
-        public void returnsCacheValueIfExists() {
+        public void returnsCacheValueIfExists()
+        {
             String result = userTimedIpCache.get(IP_1, IP_2, TIMESTAMP);
             assertEquals(USER, result);
         }

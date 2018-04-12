@@ -59,8 +59,7 @@ public class EnrichedUsersDeserializerUnitTest
 
             List<EnrichedUser> expectedUsers = Arrays.asList(
                     new EnrichedUser(123L, 256L, new IpUtil.IpPair(0L, 0L), "user0"),
-                    new EnrichedUser(256L, null, new IpUtil.IpPair(0L, 0L), "user1")
-            );
+                    new EnrichedUser(256L, null, new IpUtil.IpPair(0L, 0L), "user1"));
             assertEquals(expectedUsers, enrichedUsers);
         }
     }

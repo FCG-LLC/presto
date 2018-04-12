@@ -13,7 +13,8 @@ public class UserCacheFetcher
         implements Runnable
 {
     private static final Logger log = Logger.get(UserCacheFetcher.class);
-    private static final String DE_ENDPOINT = "http://data-enrichment:8888/ip-user";
+//    private static final String DE_ENDPOINT = "http://data-enrichment:8888/ip-user";
+    private static final String DE_ENDPOINT = "http://localhost:8888/ip-user";
 
     private final UserNameCache cache;
     private final RestClient restClient;
