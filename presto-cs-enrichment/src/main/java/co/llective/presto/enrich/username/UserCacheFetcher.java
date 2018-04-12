@@ -3,6 +3,7 @@ package co.llective.presto.enrich.username;
 import co.llective.presto.enrich.rest.RestClient;
 import co.llective.presto.enrich.rest.RestClientException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.annotations.VisibleForTesting;
 import io.airlift.log.Logger;
 
 import java.io.IOException;
@@ -13,12 +14,24 @@ public class UserCacheFetcher
 {
     private static final Logger log = Logger.get(UserCacheFetcher.class);
     private static final String DE_ENDPOINT = "http://data-enrichment:8888/ip-user";
+
     private final UserNameCache cache;
+    private final RestClient restClient;
+    private final ObjectMapper objectMapper;
+
     private int lastUserCacheHashcode;
+
+    @VisibleForTesting
+    UserCacheFetcher(UserNameCache cache, RestClient restClient, ObjectMapper objectMapper)
+    {
+        this.cache = cache;
+        this.restClient = restClient;
+        this.objectMapper = objectMapper;
+    }
 
     UserCacheFetcher(UserNameCache cache)
     {
-        this.cache = cache;
+        this(cache, new RestClient(), new ObjectMapper());
     }
 
     @Override
@@ -32,8 +45,8 @@ public class UserCacheFetcher
                 log.debug("No new data for enrichment");
                 return;
             }
-            lastUserCacheHashcode = enrichedHashcode;
             List<EnrichedUser> enrichedUsers = deserializeResponseJson(enrichedJson);
+            lastUserCacheHashcode = enrichedHashcode;
             log.debug("Populating " + enrichedUsers.size() + " users into cache");
             cache.populateEnrichedUsers(enrichedUsers);
         }
@@ -54,7 +67,6 @@ public class UserCacheFetcher
             if (timestamp != null) {
                 getParams = "?ts_from=" + timestamp;
             }
-            RestClient restClient = new RestClient();
             return restClient.getJson(DE_ENDPOINT + getParams);
         }
         catch (RestClientException exc) {
@@ -65,12 +77,23 @@ public class UserCacheFetcher
     private List<EnrichedUser> deserializeResponseJson(String json) throws CacheException
     {
         try {
-            ObjectMapper objectMapper = new ObjectMapper();
             EnrichedUser.EnrichedUsers results = objectMapper.readValue(json, EnrichedUser.EnrichedUsers.class);
             return results.getEnrichedUsers();
         }
         catch (IOException exc) {
             throw new CacheException("Couldn't deserialize response", exc);
         }
+    }
+
+    @VisibleForTesting
+    void setLastUserCacheHashcode(int lastUserCacheHashcode)
+    {
+        this.lastUserCacheHashcode = lastUserCacheHashcode;
+    }
+
+    @VisibleForTesting
+    int getLastUserCacheHashcode()
+    {
+        return lastUserCacheHashcode;
     }
 }
