@@ -13,6 +13,7 @@
  */
 package co.llective.presto.hyena;
 
+import co.llective.presto.hyena.enrich.geoip.GeoIpFunctions;
 import co.llective.presto.hyena.enrich.username.UserNameFunction;
 import co.llective.presto.hyena.types.U64BigIntOperators;
 import co.llective.presto.hyena.types.U64IntOperators;
@@ -50,6 +51,7 @@ public class HyenaPlugin
                 .add(U64BigIntOperators.class)
                 .add(U64IntOperators.class)
                 .add(UserNameFunction.class)
+                .add(GeoIpFunctions.class)
                 .build();
     }
 }
