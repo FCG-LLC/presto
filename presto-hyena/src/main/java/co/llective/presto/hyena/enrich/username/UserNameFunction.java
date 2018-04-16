@@ -24,6 +24,6 @@ public class UserNameFunction
             @SqlType(U_64) long timestamp)
     {
         String userName = cache.getUserName(ip1, ip2, timestamp);
-        return userName == null ? Slices.EMPTY_SLICE : Slices.utf8Slice(cache.getUserName(ip1, ip2, timestamp));
+        return userName == null ? Slices.EMPTY_SLICE : Slices.utf8Slice(userName);
     }
 }

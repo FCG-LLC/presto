@@ -13,13 +13,16 @@ public class GeoIpFunctions
     private static final String U_64 = U64Type.U_64_NAME;
     private GeoIpFunctions() {}
 
+    private static GeoIpProvider geoIp = GeoIpProvider.getInstance();
+
     @ScalarFunction("geoip_country")
     @SqlType(StandardTypes.VARCHAR)
     public static Slice country(
             @SqlType(U_64) long ip1,
             @SqlType(U_64) long ip2)
     {
-        return Slices.EMPTY_SLICE;
+        String city = geoIp.getCity(ip1, ip2);
+        return city == null ? Slices.EMPTY_SLICE : Slices.utf8Slice(city);
     }
 
     @ScalarFunction("geoip_city")
@@ -28,7 +31,8 @@ public class GeoIpFunctions
             @SqlType(U_64) long ip1,
             @SqlType(U_64) long ip2)
     {
-        return Slices.EMPTY_SLICE;
+        String country = geoIp.getCountry(ip1, ip2);
+        return country == null ? Slices.EMPTY_SLICE : Slices.utf8Slice(country);
     }
 
     @ScalarFunction("geoip_latitude")
@@ -38,7 +42,7 @@ public class GeoIpFunctions
             @SqlType(U_64) long ip1,
             @SqlType(U_64) long ip2)
     {
-        return 0d;
+        return geoIp.getLatitude(ip1, ip2);
     }
 
     @ScalarFunction("geoip_longitude")
@@ -48,6 +52,6 @@ public class GeoIpFunctions
             @SqlType(U_64) long ip1,
             @SqlType(U_64) long ip2)
     {
-        return 0d;
+        return geoIp.getLongitude(ip1, ip2);
     }
 }
