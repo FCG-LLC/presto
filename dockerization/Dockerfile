@@ -2,6 +2,7 @@ FROM portus.cs.int:5000/prod/cs-base-java
 LABEL maintainer "devops@collective-sense.com"
 
 ARG destEnv
+ARG debVer
 
 RUN locale-gen en_US.UTF-8 && \
     update-locale LANG=en_US.UTF-8
@@ -27,7 +28,7 @@ RUN groupadd -g 10024 hyena && \
     usermod -a -G hyena presto
 
 RUN apt-get install -y nanomsg
-RUN apt-get install -y presto
+RUN apt-get install -y presto=${debVer}
 
 RUN paxctl -c /usr/lib/jvm/java-8-oracle/jre/bin/java && \
     paxctl -m /usr/lib/jvm/java-8-oracle/jre/bin/java
