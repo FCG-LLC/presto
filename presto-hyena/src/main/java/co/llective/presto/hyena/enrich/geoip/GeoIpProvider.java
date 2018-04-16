@@ -127,7 +127,7 @@ class GeoIpProvider
 
     private DatabaseReader getDatabaseReader(String path)
     {
-        InputStream database = Thread.currentThread().getContextClassLoader().getResourceAsStream(path);
+        InputStream database = getClass().getClassLoader().getResourceAsStream(path);
         try {
             return new DatabaseReader.Builder(database).build();
         }

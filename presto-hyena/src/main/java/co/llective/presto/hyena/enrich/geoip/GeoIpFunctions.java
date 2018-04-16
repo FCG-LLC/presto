@@ -16,23 +16,25 @@ public class GeoIpFunctions
     private static GeoIpProvider geoIp = GeoIpProvider.getInstance();
 
     @ScalarFunction("geoip_country")
+    @SqlNullable
     @SqlType(StandardTypes.VARCHAR)
     public static Slice country(
             @SqlType(U_64) long ip1,
             @SqlType(U_64) long ip2)
     {
         String city = geoIp.getCity(ip1, ip2);
-        return city == null ? Slices.EMPTY_SLICE : Slices.utf8Slice(city);
+        return city == null ? null : Slices.utf8Slice(city);
     }
 
     @ScalarFunction("geoip_city")
+    @SqlNullable
     @SqlType(StandardTypes.VARCHAR)
     public static Slice city(
             @SqlType(U_64) long ip1,
             @SqlType(U_64) long ip2)
     {
         String country = geoIp.getCountry(ip1, ip2);
-        return country == null ? Slices.EMPTY_SLICE : Slices.utf8Slice(country);
+        return country == null ? null : Slices.utf8Slice(country);
     }
 
     @ScalarFunction("geoip_latitude")
