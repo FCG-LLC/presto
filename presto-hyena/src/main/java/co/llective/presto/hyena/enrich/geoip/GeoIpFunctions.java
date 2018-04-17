@@ -13,7 +13,7 @@ public class GeoIpFunctions
     private static final String U_64 = U64Type.U_64_NAME;
     private GeoIpFunctions() {}
 
-    private static GeoIpProvider geoIp = GeoIpProvider.getInstance();
+    private static GeoIpCache geoIp = GeoIpCache.getInstance();
 
     @ScalarFunction("geoip_country")
     @SqlNullable

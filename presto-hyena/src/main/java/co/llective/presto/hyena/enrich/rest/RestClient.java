@@ -15,7 +15,7 @@ public class RestClient
      * Performs GET method on desired address and returns payload as json.
      * @param address address of service
      * @return response payload as json
-     * @throws RestClientException in case of error
+     * @throws RestClientException in case of an error
      */
     public String getJson(String address) throws RestClientException
     {
@@ -43,7 +43,7 @@ public class RestClient
      * Extracts payload from {@link HttpEntity}
      * @param entity http entity with content
      * @return content of entity as String
-     * @throws IOException if something went wrong with extracting
+     * @throws IOException if something went wrong with extracting payload
      */
     private String processResponse(HttpEntity entity) throws IOException
     {

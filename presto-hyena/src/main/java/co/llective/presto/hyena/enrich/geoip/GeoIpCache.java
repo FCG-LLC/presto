@@ -9,20 +9,27 @@ import io.airlift.log.Logger;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static co.llective.presto.hyena.enrich.util.IpUtil.WKP;
 
-class GeoIpProvider
+class GeoIpCache
 {
-    private GeoIpProvider() {}
-
     private static final String CITY_MMDB_PATH = "GeoLite2-City.mmdb";
     private static final String COUNTRY_MMDB_PATH = "GeoLite2-Country.mmdb";
-    private static final Logger LOGGER = Logger.get(GeoIpProvider.class);
+    private static final Logger log = Logger.get(GeoIpCache.class);
+    private static final ScheduledExecutorService SCHEDULED_THREAD = Executors.newSingleThreadScheduledExecutor();
+    private static final int RELOAD_PERIOD_MIN = 5;
 
     private final DatabaseReader cityReader = getDatabaseReader(CITY_MMDB_PATH);
     private final DatabaseReader countryReader = getDatabaseReader(COUNTRY_MMDB_PATH);
@@ -47,12 +54,22 @@ class GeoIpProvider
     private Map<SubnetV4, Double> localLongitudeV4Map = new LinkedHashMap<>();
     private Map<SubnetV6, Double> localLongitudeV6Map = new LinkedHashMap<>();
 
-    private static class LazyHolder
+    private GeoIpCache()
     {
-        static final GeoIpProvider INSTANCE = new GeoIpProvider();
+        log.info("Scheduling local geoip enrichment updater. Reload periond " + RELOAD_PERIOD_MIN + " minutes");
+        SCHEDULED_THREAD.scheduleAtFixedRate(
+                new GeoIpFetcher(this),
+                0,
+                RELOAD_PERIOD_MIN,
+                TimeUnit.MINUTES);
     }
 
-    static GeoIpProvider getInstance()
+    private static class LazyHolder
+    {
+        static final GeoIpCache INSTANCE = new GeoIpCache();
+    }
+
+    static GeoIpCache getInstance()
     {
         return LazyHolder.INSTANCE;
     }
@@ -77,10 +94,67 @@ class GeoIpProvider
         return getValue(ip1, ip2, longitudeProvider, longitudeCache, localLongitudeV4Map, localLongitudeV6Map);
     }
 
+    private void clearEntries()
+    {
+        localCityV4Map.clear();
+        localCountryV4Map.clear();
+        localLatitudeV4Map.clear();
+        localLongitudeV4Map.clear();
+        localCityV6Map.clear();
+        localCountryV6Map.clear();
+        localLatitudeV6Map.clear();
+        localLongitudeV6Map.clear();
+
+        // update of local cache also clears whole cache
+        cityCache.clear();
+        countryCache.clear();
+        latitudeCache.clear();
+        longitudeCache.clear();
+    }
+
+    void populateLocalGeoIp(List<LocalGeoIpEnrichment> geoIpEnrichments)
+    {
+        log.info("Populating new local GeoIp enrichment with: " + geoIpEnrichments.size() + " entries");
+
+        clearEntries();
+
+        for (LocalGeoIpEnrichment entry : geoIpEnrichments) {
+            int index = entry.getSubnet().indexOf('/');
+
+            String address = entry.getSubnet().substring(0, index);
+            int maskLength = Integer.parseInt(entry.getSubnet().substring(index + 1));
+
+            try {
+                InetAddress inetAddress = InetAddress.getByName(address);
+
+                if (inetAddress instanceof Inet4Address) {
+                    SubnetV4 subnetV4 = new SubnetV4(address, maskLength);
+                    localCityV4Map.put(subnetV4, entry.getCity());
+                    localCountryV4Map.put(subnetV4, entry.getCountry());
+                    localLatitudeV4Map.put(subnetV4, entry.getLat());
+                    localLongitudeV4Map.put(subnetV4, entry.getLon());
+                }
+                else if (inetAddress instanceof Inet6Address) {
+                    SubnetV6 subnetV6 = new SubnetV6(address, maskLength);
+                    localCityV6Map.put(subnetV6, entry.getCity());
+                    localCountryV6Map.put(subnetV6, entry.getCountry());
+                    localLatitudeV6Map.put(subnetV6, entry.getLat());
+                    localLongitudeV6Map.put(subnetV6, entry.getLon());
+                }
+                else {
+                    throw new UnknownHostException();
+                }
+            }
+            catch (UnknownHostException exc) {
+                log.debug("Wrong IP address in local geoip " + address, exc);
+            }
+        }
+    }
+
     private <R> R getValue(long ip1, long ip2, ResultProvider<R> provider, SoftCache<R> cache,
             Map<SubnetV4, R> v4localProvider, Map<SubnetV6, R> v6localProvider)
     {
-        // check cache
+        // firstly check cache
         Map<Long, R> inner = cache.getInnerMap(ip1);
         if (inner.containsKey(ip2)) {
             return inner.get(ip2);
@@ -88,7 +162,7 @@ class GeoIpProvider
 
         R result = null;
 
-        // check local subnets
+        // then check local subnets
         if (ip1 == WKP) {
             for (Map.Entry<SubnetV4, R> entry : v4localProvider.entrySet()) {
                 SubnetV4 subnet = entry.getKey();
@@ -111,7 +185,7 @@ class GeoIpProvider
             }
         }
 
-        // check maxmind database
+        // then check maxmind database
         try {
             InetAddress address = getAddressFromIps(ip1, ip2);
             if (!address.isSiteLocalAddress() && !address.isLinkLocalAddress()) {
@@ -121,6 +195,7 @@ class GeoIpProvider
         catch (GeoIp2Exception | IOException error) {
             // NOP
         }
+        // then even if value is null put it into cache
         inner.put(ip2, result);
         return result;
     }
