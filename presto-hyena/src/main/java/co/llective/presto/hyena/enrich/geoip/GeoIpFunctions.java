@@ -22,7 +22,7 @@ public class GeoIpFunctions
             @SqlType(U_64) long ip1,
             @SqlType(U_64) long ip2)
     {
-        String city = geoIp.getCity(ip1, ip2);
+        String city = geoIp.getCountry(ip1, ip2);
         return city == null ? null : Slices.utf8Slice(city);
     }
 
@@ -33,7 +33,7 @@ public class GeoIpFunctions
             @SqlType(U_64) long ip1,
             @SqlType(U_64) long ip2)
     {
-        String country = geoIp.getCountry(ip1, ip2);
+        String country = geoIp.getCity(ip1, ip2);
         return country == null ? null : Slices.utf8Slice(country);
     }
 
