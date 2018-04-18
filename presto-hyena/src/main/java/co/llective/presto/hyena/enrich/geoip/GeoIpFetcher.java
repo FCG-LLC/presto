@@ -15,7 +15,7 @@ public class GeoIpFetcher
 {
     private static final Logger log = Logger.get(GeoIpFetcher.class);
     //TODO: change this to /config/presto or /config/de when we will be dropping drill
-    private static final String TOUCAN_GEO_IP_ENDPOINT = "http://toucan:3000/config/drill/geoip_enrichment_user";
+    static final String TOUCAN_GEO_IP_ENDPOINT = "http://toucan:3000/config/drill/geoip_enrichment_user";
 
     private final GeoIpCache geoIpCache;
     private final RestClient restClient;
@@ -77,5 +77,17 @@ public class GeoIpFetcher
         catch (IOException exc) {
             throw new CacheException("Couldn't deserialize response", exc);
         }
+    }
+
+    @VisibleForTesting
+    void setLastLocalGeoIpHashcode(int lastLocalGeoIpHashcode)
+    {
+        this.lastLocalGeoIpHashcode = lastLocalGeoIpHashcode;
+    }
+
+    @VisibleForTesting
+    int getLastLocalGeoIpHashcode()
+    {
+        return lastLocalGeoIpHashcode;
     }
 }
