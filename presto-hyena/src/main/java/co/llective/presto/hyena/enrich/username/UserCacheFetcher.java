@@ -51,7 +51,7 @@ public class UserCacheFetcher
             cache.populateEnrichedUsers(enrichedUsers);
         }
         catch (CacheException exc) {
-            log.error("Cache couldn't be populated", exc.getMessage());
+            log.error("Cache couldn't be populated: %s", exc.getMessage());
         }
     }
 
@@ -70,7 +70,7 @@ public class UserCacheFetcher
             return restClient.getJson(DE_ENDPOINT + getParams);
         }
         catch (RestClientException exc) {
-            throw new CacheException("Error during fetching enrichment data", exc);
+            throw new CacheException("Error during fetching enrichment data: " + exc.getMessage(), exc);
         }
     }
 

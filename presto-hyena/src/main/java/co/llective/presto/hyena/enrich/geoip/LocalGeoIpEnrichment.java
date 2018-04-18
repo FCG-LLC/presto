@@ -1,6 +1,7 @@
 package co.llective.presto.hyena.enrich.geoip;
 
 import java.util.List;
+import java.util.Objects;
 
 public class LocalGeoIpEnrichment
 {
@@ -44,11 +45,34 @@ public class LocalGeoIpEnrichment
         return lat;
     }
 
-    public static class LocalGeoIpEnrichemnts
+    @Override
+    public boolean equals(Object o)
+    {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        LocalGeoIpEnrichment that = (LocalGeoIpEnrichment) o;
+        return Objects.equals(subnet, that.subnet) &&
+                Objects.equals(city, that.city) &&
+                Objects.equals(country, that.country) &&
+                Objects.equals(lon, that.lon) &&
+                Objects.equals(lat, that.lat);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(subnet, city, country, lon, lat);
+    }
+
+    public static class LocalGeoIpEnrichments
     {
         private List<LocalGeoIpEnrichment> enrichedGeoIps;
 
-        LocalGeoIpEnrichemnts(List<LocalGeoIpEnrichment> enrichedGeoIps)
+        LocalGeoIpEnrichments(List<LocalGeoIpEnrichment> enrichedGeoIps)
         {
             this.enrichedGeoIps = enrichedGeoIps;
         }
@@ -56,6 +80,25 @@ public class LocalGeoIpEnrichment
         List<LocalGeoIpEnrichment> getEnrichedGeoIps()
         {
             return enrichedGeoIps;
+        }
+
+        @Override
+        public boolean equals(Object o)
+        {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            LocalGeoIpEnrichments that = (LocalGeoIpEnrichments) o;
+            return Objects.equals(enrichedGeoIps, that.enrichedGeoIps);
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(enrichedGeoIps);
         }
     }
 }

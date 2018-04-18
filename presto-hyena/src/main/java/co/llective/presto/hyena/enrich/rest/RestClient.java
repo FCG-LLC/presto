@@ -4,6 +4,7 @@ import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.HttpClientBuilder;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -20,10 +21,7 @@ public class RestClient
     public String getJson(String address) throws RestClientException
     {
         try {
-            // for some reason there is need of using obsolete default http client
-            // because drill cannot find newer packages
-//            HttpClient httpClient = HttpClientBuilder.create().build();
-            HttpClient httpClient = new org.apache.http.impl.client.DefaultHttpClient();
+            HttpClient httpClient = HttpClientBuilder.create().build();
             HttpGet httpGet = new HttpGet(address);
             HttpResponse response = httpClient.execute(httpGet);
             HttpEntity entity = response.getEntity();
@@ -35,7 +33,7 @@ public class RestClient
             }
         }
         catch (IOException exc) {
-            throw new RestClientException("Error while fetching data", exc);
+            throw new RestClientException("Error while fetching data: " + exc.getMessage(), exc);
         }
     }
 

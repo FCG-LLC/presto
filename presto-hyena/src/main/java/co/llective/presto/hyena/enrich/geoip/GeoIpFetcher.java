@@ -14,6 +14,7 @@ public class GeoIpFetcher
         implements Runnable
 {
     private static final Logger log = Logger.get(GeoIpFetcher.class);
+    //TODO: change this to /config/presto or /config/de when we will be dropping drill
     private static final String TOUCAN_GEO_IP_ENDPOINT = "http://toucan:3000/config/drill/geoip_enrichment_user";
 
     private final GeoIpCache geoIpCache;
@@ -69,8 +70,8 @@ public class GeoIpFetcher
             throws CacheException
     {
         try {
-            LocalGeoIpEnrichment.LocalGeoIpEnrichemnts geoIpEnrichemnts =
-                    objectMapper.readValue(json, LocalGeoIpEnrichment.LocalGeoIpEnrichemnts.class);
+            LocalGeoIpEnrichment.LocalGeoIpEnrichments geoIpEnrichemnts =
+                    objectMapper.readValue(json, LocalGeoIpEnrichment.LocalGeoIpEnrichments.class);
             return geoIpEnrichemnts.getEnrichedGeoIps();
         }
         catch (IOException exc) {
