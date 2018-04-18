@@ -3,6 +3,7 @@ package co.llective.presto.hyena.enrich.geoip;
 import co.llective.presto.hyena.enrich.util.SoftCache;
 import co.llective.presto.hyena.enrich.util.SubnetV4;
 import co.llective.presto.hyena.enrich.util.SubnetV6;
+import com.google.common.annotations.VisibleForTesting;
 import com.maxmind.geoip2.DatabaseReader;
 import com.maxmind.geoip2.exception.GeoIp2Exception;
 import io.airlift.log.Logger;
@@ -151,7 +152,8 @@ class GeoIpCache
         }
     }
 
-    private <R> R getValue(long ip1, long ip2, ResultProvider<R> provider, SoftCache<R> cache,
+    @VisibleForTesting
+    <R> R getValue(long ip1, long ip2, ResultProvider<R> provider, SoftCache<R> cache,
             Map<SubnetV4, R> v4localProvider, Map<SubnetV6, R> v6localProvider)
     {
         // firstly check cache
@@ -211,8 +213,9 @@ class GeoIpCache
         }
     }
 
+    @VisibleForTesting
     @FunctionalInterface
-    private interface ResultProvider<R>
+    interface ResultProvider<R>
     {
         R apply(InetAddress inetAddress) throws GeoIp2Exception, IOException;
     }
