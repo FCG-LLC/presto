@@ -3,6 +3,7 @@ package co.llective.presto.hyena.enrich.username;
 import co.llective.presto.hyena.types.U64Type;
 import com.facebook.presto.spi.function.Description;
 import com.facebook.presto.spi.function.ScalarFunction;
+import com.facebook.presto.spi.function.SqlNullable;
 import com.facebook.presto.spi.function.SqlType;
 import com.facebook.presto.spi.type.StandardTypes;
 import io.airlift.slice.Slice;
@@ -18,12 +19,13 @@ public class UserNameFunction
     private static UserNameCache cache = UserNameCache.getInstance();
 
     @SqlType(StandardTypes.VARCHAR)
+    @SqlNullable
     public static Slice userName(
             @SqlType(U_64) long ip1,
             @SqlType(U_64) long ip2,
             @SqlType(U_64) long timestamp)
     {
         String userName = cache.getUserName(ip1, ip2, timestamp);
-        return userName == null ? Slices.EMPTY_SLICE : Slices.utf8Slice(cache.getUserName(ip1, ip2, timestamp));
+        return userName == null ? null : Slices.utf8Slice(userName);
     }
 }
