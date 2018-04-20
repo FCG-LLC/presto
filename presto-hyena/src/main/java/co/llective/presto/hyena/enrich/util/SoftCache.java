@@ -39,7 +39,8 @@ public class SoftCache<T>
         inner.put(ip2, value);
     }
 
-    public void clear() {
+    public void clear()
+    {
         mapRef.clear();
     }
 }

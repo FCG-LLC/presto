@@ -4,6 +4,7 @@ import co.llective.presto.hyena.enrich.util.IpUtil;
 import co.llective.presto.hyena.enrich.util.SoftCache;
 import co.llective.presto.hyena.enrich.util.SubnetV4;
 import co.llective.presto.hyena.enrich.util.SubnetV6;
+import com.google.common.annotations.VisibleForTesting;
 import io.airlift.log.Logger;
 
 import java.net.Inet4Address;
@@ -21,16 +22,16 @@ public class ApplicationNameCache
     private static final Logger log = Logger.get(ApplicationNameCache.class);
     private static final ScheduledExecutorService SCHEDULED_THREAD = Executors.newSingleThreadScheduledExecutor();
     private static final int RELOAD_PERIOD_MIN = 5;
-    private static final String UNKNOWN_NAME = ""; // empty string is marking ip in cache as not named
+    @VisibleForTesting static final String UNKNOWN_NAME = ""; // empty string is marking ip in cache as not named
 
     private Map<SubnetV4, String> ipv4Subnets = new LinkedHashMap<>();
     private Map<SubnetV6, String> ipv6Subnets = new LinkedHashMap<>();
-    private String[] portNames;
+    private String[] portNames = initPortNames();
     private final SoftCache<String> cache = new SoftCache<>();
 
     private ApplicationNameCache()
     {
-        log.info("Scheduling local geoip enrichment updater. Reload periond " + RELOAD_PERIOD_MIN + " minutes");
+        log.info("Scheduling local geoip enrichment updater. Reload period " + RELOAD_PERIOD_MIN + " minutes");
         SCHEDULED_THREAD.scheduleAtFixedRate(
                 new ApplicationNameFetcher(this),
                 0,
@@ -48,11 +49,16 @@ public class ApplicationNameCache
         return LazyHolder.INSTANCE;
     }
 
+    private String[] initPortNames()
+    {
+        return new String[49151]; // largest not ephemeral port number
+    }
+
     private void clear()
     {
         ipv4Subnets.clear();
         ipv6Subnets.clear();
-        portNames = new String[49151]; // largest not ephemeral port number
+        portNames = initPortNames();
         cache.clear();
     }
 
@@ -138,7 +144,7 @@ public class ApplicationNameCache
         return getPortName(port);
     }
 
-    public String getApplicationName(long ip1, long ip2)
+    String getApplicationName(long ip1, long ip2)
     {
         return getApplicationName(ip1, ip2, -1);
     }
@@ -146,5 +152,17 @@ public class ApplicationNameCache
     private String getPortName(long port)
     {
         return port > 0 && port < portNames.length ? portNames[(int) port] : null;
+    }
+
+    @VisibleForTesting
+    SoftCache<String> getCache()
+    {
+        return cache;
+    }
+
+    @VisibleForTesting
+    public String[] getPortNames()
+    {
+        return portNames;
     }
 }
