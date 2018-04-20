@@ -16,8 +16,8 @@ public class ApplicationNameFetcher
 {
     private static final Logger log = Logger.get(ApplicationNameFetcher.class);
     private static final String TOUCAN_ENDPOINT = "http://toucan:3000/config/";
-    private static final String TOUCAN_APP_GLOBAL_ENDPOINT = TOUCAN_ENDPOINT + "drill/app_enrichment_global";
-    private static final String TOUCAN_APP_USER_ENDPOINT = TOUCAN_ENDPOINT + "drill/app_enrichment_user";
+    static final String TOUCAN_APP_GLOBAL_ENDPOINT = TOUCAN_ENDPOINT + "drill/app_enrichment_global";
+    static final String TOUCAN_APP_USER_ENDPOINT = TOUCAN_ENDPOINT + "drill/app_enrichment_user";
 
     private final ApplicationNameCache cache;
     private final RestClient restClient;
@@ -38,7 +38,6 @@ public class ApplicationNameFetcher
         this(applicationNameCache, new RestClient(), new ObjectMapper());
     }
 
-
     @Override
     public void run()
     {
@@ -52,7 +51,8 @@ public class ApplicationNameFetcher
 
         if (lastAppNameHashcode == currentHashCode) {
             log.debug("No new data for application name enrichment");
-        } else {
+        }
+        else {
             lastAppNameHashcode = mergedAppNames.hashCode();
             cache.populateEnrichedAppNames(mergedAppNames);
         }
@@ -81,7 +81,8 @@ public class ApplicationNameFetcher
         }
     }
 
-    private EnrichedAppNames mergeAppNames(EnrichedAppNames[] appNamesList) {
+    private EnrichedAppNames mergeAppNames(EnrichedAppNames[] appNamesList)
+    {
         LinkedHashMap<String, String> names = new LinkedHashMap<>();
         LinkedHashMap<Integer, String> ports = new LinkedHashMap<>();
         EnrichedAppNames result = new EnrichedAppNames(names, ports);
@@ -103,5 +104,11 @@ public class ApplicationNameFetcher
         }
 
         return result;
+    }
+
+    @VisibleForTesting
+    void setLastAppNameHashcode(int lastAppNameHashcode)
+    {
+        this.lastAppNameHashcode = lastAppNameHashcode;
     }
 }
