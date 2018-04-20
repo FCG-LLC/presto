@@ -12,6 +12,8 @@ public class ApplicationNameFunctions
     private static final String U_64 = U64Type.U_64_NAME;
     private ApplicationNameFunctions() {}
 
+    private static ApplicationNameCache appNameCache = ApplicationNameCache.getInstance();
+
     @ScalarFunction("application_name")
     @SqlType(StandardTypes.VARCHAR)
     public static Slice ApplicationNameWithPort(
@@ -19,7 +21,8 @@ public class ApplicationNameFunctions
             @SqlType(U_64) long ip2,
             @SqlType(StandardTypes.INTEGER) long port)
     {
-        return Slices.utf8Slice("appname");
+        String appName = appNameCache.getApplicationName(ip1, ip2, port);
+        return appName == null ? null : Slices.utf8Slice(appName);
     }
 
     @ScalarFunction("application_name")
@@ -28,6 +31,7 @@ public class ApplicationNameFunctions
             @SqlType(U_64) long ip1,
             @SqlType(U_64) long ip2)
     {
-        return Slices.utf8Slice("appname without port");
+        String appName = appNameCache.getApplicationName(ip1, ip2);
+        return appName == null ? null : Slices.utf8Slice(appName);
     }
 }

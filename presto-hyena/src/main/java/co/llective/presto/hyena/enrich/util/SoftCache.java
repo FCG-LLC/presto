@@ -27,8 +27,19 @@ public class SoftCache<T>
         return inner;
     }
 
-    public void clear()
+    public T get(long ip1, long ip2)
     {
+        Map<Long, T> inner = getInnerMap(ip1);
+        return inner.get(ip2);
+    }
+
+    public void put(long ip1, long ip2, T value)
+    {
+        Map<Long, T> inner = getInnerMap(ip1);
+        inner.put(ip2, value);
+    }
+
+    public void clear() {
         mapRef.clear();
     }
 }
