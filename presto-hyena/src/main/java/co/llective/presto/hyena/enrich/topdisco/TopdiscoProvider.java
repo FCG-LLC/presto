@@ -22,7 +22,7 @@ public class TopdiscoProvider
     private final Map<Long, Map<Long, String>> ipv6RouterNames = new HashMap<>();
     private final Map<Long, Map<Integer, String>> ipv4InterfaceNames = new HashMap<>();
     private final Map<Long, Map<Long, Map<Integer, String>>> ipv6InterfaceNames = new HashMap<>();
-    private final SoftCache<String> routerNamesCahce = new SoftCache<>();
+    private final SoftCache<String> ipStrings = new SoftCache<>();
     private SoftReference<Map<Integer, String>> interfaceNamesCache = new SoftReference<>(null);
 
     private TopdiscoProvider()
