@@ -16,6 +16,8 @@ package co.llective.presto.hyena;
 import co.llective.presto.hyena.enrich.appname.ApplicationNameFunctions;
 import co.llective.presto.hyena.enrich.geoip.GeoIpFunctions;
 import co.llective.presto.hyena.enrich.ipstring.IpToStringFunction;
+import co.llective.presto.hyena.enrich.topdisco.InterfaceNameFunction;
+import co.llective.presto.hyena.enrich.topdisco.RouterNameFunction;
 import co.llective.presto.hyena.enrich.username.UserNameFunction;
 import co.llective.presto.hyena.types.U64BigIntOperators;
 import co.llective.presto.hyena.types.U64IntOperators;
@@ -56,6 +58,8 @@ public class HyenaPlugin
                 .add(GeoIpFunctions.class)
                 .add(IpToStringFunction.class)
                 .add(ApplicationNameFunctions.class)
+                .add(InterfaceNameFunction.class)
+                .add(RouterNameFunction.class)
                 .build();
     }
 }
