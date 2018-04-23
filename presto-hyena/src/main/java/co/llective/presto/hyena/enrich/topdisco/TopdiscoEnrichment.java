@@ -45,7 +45,8 @@ class TopdiscoEnrichment
         return Objects.hash(ips, interfaces);
     }
 
-    static class Ip {
+    static class Ip
+    {
         private final String ip;
         private final String name;
 
@@ -104,7 +105,8 @@ class TopdiscoEnrichment
         }
     }
 
-    static class Interface {
+    static class Interface
+    {
         private final String port;
         private final int index;
         private final Set<String> ips;

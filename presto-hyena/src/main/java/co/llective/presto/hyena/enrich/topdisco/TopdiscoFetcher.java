@@ -12,7 +12,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 public class TopdiscoFetcher
-    implements Runnable
+        implements Runnable
 {
     private static final Logger log = Logger.get(TopdiscoFetcher.class);
     private static final String JDBC_URL = "jdbc:postgresql://postgres:5432/netdisco";
@@ -50,7 +50,8 @@ public class TopdiscoFetcher
         try {
             // load Postgres JDBC driver in runtime
             Class.forName("org.postgresql.Driver");
-        } catch (ClassNotFoundException e) {
+        }
+        catch (ClassNotFoundException e) {
             e.printStackTrace();
         }
     }
@@ -79,7 +80,8 @@ public class TopdiscoFetcher
                 lastResponseHash = response.hashCode();
                 topdiscoProvider.populateTopdiscoData(deserializedResponse);
             }
-        } catch (Exception exc) {
+        }
+        catch (Exception exc) {
             log.error("An exception occurred during Topdisco ip enrichment cache reload", exc);
         }
     }
@@ -95,12 +97,14 @@ public class TopdiscoFetcher
         }
     }
 
-    private TopdiscoEnrichment parseData(String json) {
+    private TopdiscoEnrichment parseData(String json)
+    {
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         try {
             return objectMapper.readValue(json, TopdiscoEnrichment.class);
-        } catch (IOException exc) {
+        }
+        catch (IOException exc) {
             log.error("Cannot parse Topdisco ip enrichment data from Postgres", exc);
             return null;
         }

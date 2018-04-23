@@ -33,8 +33,7 @@ public class TopdiscoProvider
                 new TopdiscoFetcher(this),
                 0,
                 RELOAD_PERIOD_MIN,
-                TimeUnit.MINUTES
-        );
+                TimeUnit.MINUTES);
     }
 
     private static class LazyHolder
@@ -56,7 +55,6 @@ public class TopdiscoProvider
         ipv4InterfaceNames.clear();
         ipv6InterfaceNames.clear();
     }
-
 
     void populateTopdiscoData(TopdiscoEnrichment deserializedResponse)
     {
@@ -105,7 +103,9 @@ public class TopdiscoProvider
     private void populateIpEntityRouterName(TopdiscoEnrichment.Ip entity, IpUtil.IpPair ip)
     {
         // only entryType 0 (snmp from device table) and 1 (dns names) are taken
-        if (entity.getEntryType() >= 2) return;
+        if (entity.getEntryType() >= 2) {
+            return;
+        }
 
         if (ip.isIp4()) {
             ipv4RouterNames.put(ip.getLowBits(), entity.getName());
@@ -136,7 +136,8 @@ public class TopdiscoProvider
         Map<Long, Map<Integer, String>> lowBitsMap;
         if (ipPair.isIp4()) {
             lowBitsMap = ipv4InterfaceNames;
-        } else {
+        }
+        else {
             lowBitsMap = ipv6InterfaceNames.computeIfAbsent(ipPair.getHighBits(), k -> new HashMap<>());
         }
 
@@ -144,7 +145,8 @@ public class TopdiscoProvider
         interfacesMap.put(index, port);
     }
 
-    private String getIpStr(long ip1, long ip2) {
+    private String getIpStr(long ip1, long ip2)
+    {
         String str = ipStrings.get(ip1, ip2);
         if (str == null) {
             str = new IpUtil.IpPair(ip1, ip2).toString();
@@ -153,7 +155,8 @@ public class TopdiscoProvider
         return str;
     }
 
-    private String getInterfaceStr(int interfaceNumber) {
+    private String getInterfaceStr(int interfaceNumber)
+    {
         Map<Integer, String> ref = interfaceNames.get();
         if (ref == null) {
             ref = new HashMap<>();
