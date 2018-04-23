@@ -77,10 +77,6 @@ public class TopdiscoFetcher
             TopdiscoEnrichment deserializedResponse = parseData(response);
             if (deserializedResponse != null) {
                 lastResponseHash = response.hashCode();
-                int ipsLength = deserializedResponse.getIps() == null ? 0 : deserializedResponse.getIps().size();
-                int interfacesLength = deserializedResponse.getInterfaces() == null ? 0 : deserializedResponse.getInterfaces().size();
-                log.info("Topdisco ip enrichment updated: " +
-                        ipsLength + " ips and " + interfacesLength + " interfaces");
                 topdiscoProvider.populateTopdiscoData(deserializedResponse);
             }
         } catch (Exception exc) {
