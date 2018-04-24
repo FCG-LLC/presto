@@ -2,6 +2,7 @@ package co.llective.presto.hyena.enrich.topdisco;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.annotations.VisibleForTesting;
 import io.airlift.log.Logger;
 
 import java.io.IOException;
@@ -44,6 +45,7 @@ public class TopdiscoFetcher
             "      FROM ips,\n" +
             "           interfaces) r";
     private final TopdiscoProvider topdiscoProvider;
+    private final ObjectMapper objectMapper;
     private int lastResponseHash;
 
     static {
@@ -58,7 +60,14 @@ public class TopdiscoFetcher
 
     TopdiscoFetcher(TopdiscoProvider topdiscoProvider)
     {
+        this(topdiscoProvider, new ObjectMapper());
+    }
+
+    @VisibleForTesting
+    TopdiscoFetcher(TopdiscoProvider topdiscoProvider, ObjectMapper objectMapper)
+    {
         this.topdiscoProvider = topdiscoProvider;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -86,7 +95,8 @@ public class TopdiscoFetcher
         }
     }
 
-    private String fetchData() throws SQLException
+    @VisibleForTesting
+    String fetchData() throws SQLException
     {
         try (Connection connection = DriverManager.getConnection(JDBC_URL, JDBC_USERNAME, JDBC_PASSWORD)) {
             try (Statement statement = connection.createStatement()) {
@@ -99,7 +109,6 @@ public class TopdiscoFetcher
 
     private TopdiscoEnrichment parseData(String json)
     {
-        ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         try {
             return objectMapper.readValue(json, TopdiscoEnrichment.class);
@@ -108,5 +117,17 @@ public class TopdiscoFetcher
             log.error("Cannot parse Topdisco ip enrichment data from Postgres", exc);
             return null;
         }
+    }
+
+    @VisibleForTesting
+    void setLastResponseHash(int lastResponseHash)
+    {
+        this.lastResponseHash = lastResponseHash;
+    }
+
+    @VisibleForTesting
+    int getLastResponseHash()
+    {
+        return lastResponseHash;
     }
 }
