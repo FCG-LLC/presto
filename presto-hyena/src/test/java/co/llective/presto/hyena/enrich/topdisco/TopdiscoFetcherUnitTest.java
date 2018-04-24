@@ -34,8 +34,7 @@ public class TopdiscoFetcherUnitTest
         int responseHashCode = responseJson.hashCode();
         TopdiscoEnrichment deserializedResponse = new TopdiscoEnrichment(
                 Collections.singletonList(new TopdiscoEnrichment.Ip("ip", "name", (short) 1)),
-                Collections.singletonList(new TopdiscoEnrichment.Interface("80", 2, new HashSet<>(Collections.singletonList("ip2"))))
-        );
+                Collections.singletonList(new TopdiscoEnrichment.Interface("80", 2, new HashSet<>(Collections.singletonList("ip2")))));
 
         @BeforeMethod
         public void setUp()
