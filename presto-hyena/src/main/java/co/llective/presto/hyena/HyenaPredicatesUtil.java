@@ -13,8 +13,10 @@
  */
 package co.llective.presto.hyena;
 
+import co.llective.hyena.api.ScanAndFilters;
 import co.llective.hyena.api.ScanComparison;
 import co.llective.hyena.api.ScanFilter;
+import co.llective.hyena.api.ScanOrFilters;
 import co.llective.presto.hyena.types.U64Type;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.predicate.Marker;
@@ -25,8 +27,6 @@ import com.google.common.primitives.UnsignedLong;
 import io.airlift.slice.Slice;
 import org.apache.commons.lang3.NotImplementedException;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -37,9 +37,9 @@ public class HyenaPredicatesUtil
     public HyenaPredicatesUtil()
     {}
 
-    public List<ScanFilter> predicateToFilters(TupleDomain<HyenaColumnHandle> predicate)
+    public ScanOrFilters predicateToFilters(TupleDomain<HyenaColumnHandle> predicate)
     {
-        List<ScanFilter> filters = new ArrayList<>();
+        ScanOrFilters filters = new ScanOrFilters();
         //no predicates, no filters, no problem
         if (!predicate.getDomains().isPresent()) {
             return filters;
@@ -49,7 +49,7 @@ public class HyenaPredicatesUtil
 
         domainMap.forEach((column, values) -> values.getValues().getValuesProcessor().consume(
                 ranges -> {
-                    filters.addAll(toScanFilters(column, ranges));
+                    filters.addAll(toOrScanFilters(column, ranges));
                 },
                 discreteValues -> {
                     throw new NotImplementedException("Discrete values are not handled yet"); },
@@ -58,9 +58,9 @@ public class HyenaPredicatesUtil
         return filters;
     }
 
-    private List<ScanFilter> toScanFilters(HyenaColumnHandle column, Ranges ranges)
+    private ScanOrFilters toOrScanFilters(HyenaColumnHandle column, Ranges ranges)
     {
-        List<ScanFilter> filters = new ArrayList<>();
+        ScanOrFilters filters = new ScanOrFilters();
         for (Range range : ranges.getOrderedRanges()) {
             // handle = situation
             if (range.isSingleValue()) {
@@ -70,15 +70,23 @@ public class HyenaPredicatesUtil
                 Marker high = range.getHigh();
                 Marker low = range.getLow();
 
-                // handle > or >= situation
-                if (low.getValueBlock().isPresent()) {
-                    ScanFilter filter = createLowScanFilter(column, low);
+                if (low.getValueBlock().isPresent() && high.getValueBlock().isPresent()) {
+                    // handle BETWEEN case
+                    ScanAndFilters scanAndFilters = new ScanAndFilters();
+
+                    scanAndFilters.add(createLowScanFilter(column, low));
+                    scanAndFilters.add(createHighScanFilter(column, high));
+
+                    filters.add(scanAndFilters);
+                }
+                else if (low.getValueBlock().isPresent()) {
+                    // handle > or >= situation
+                    ScanAndFilters filter = new ScanAndFilters(createLowScanFilter(column, low));
                     filters.add(filter);
                 }
-
-                // handle < or <= situation
-                if (high.getValueBlock().isPresent()) {
-                    ScanFilter filter = createHighScanFilter(column, high);
+                else if (high.getValueBlock().isPresent()) {
+                    // handle < or <= situation
+                    ScanAndFilters filter = new ScanAndFilters(createHighScanFilter(column, high));
                     filters.add(filter);
                 }
             }
@@ -159,16 +167,18 @@ public class HyenaPredicatesUtil
         }
     }
 
-    private ScanFilter createSingleFilter(HyenaColumnHandle column, ScanComparison comparisonOperator, Object singleValue)
+    private ScanAndFilters createSingleFilter(HyenaColumnHandle column, ScanComparison comparisonOperator, Object singleValue)
     {
+        ScanAndFilters andFilters = new ScanAndFilters();
         if (column.getColumnType() == VARCHAR) {
             Slice val = (Slice) singleValue;
-            return getNewScanFilter(column, comparisonOperator, val, val.toStringUtf8());
+            andFilters.add(getNewScanFilter(column, comparisonOperator, val, val.toStringUtf8()));
         }
         else {
             Long val = (Long) singleValue;
-            return getNewScanFilter(column, comparisonOperator, val, null);
+            andFilters.add(getNewScanFilter(column, comparisonOperator, val, null));
         }
+        return andFilters;
     }
 
     private ScanFilter getNewScanFilter(HyenaColumnHandle column, ScanComparison op, Object value, String stringValue)
