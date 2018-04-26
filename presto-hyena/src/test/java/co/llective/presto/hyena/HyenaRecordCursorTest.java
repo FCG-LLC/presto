@@ -19,15 +19,23 @@ import co.llective.hyena.api.DataTriple;
 import co.llective.hyena.api.DenseBlock;
 import co.llective.hyena.api.ScanResult;
 import co.llective.hyena.api.SparseBlock;
+import co.llective.hyena.api.Testtt;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.IntegerType;
+import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
+import org.apache.commons.collections.FastHashMap;
+import org.clapper.util.misc.SparseArrayList;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import java.util.TreeMap;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -36,6 +44,146 @@ import static org.testng.Assert.assertEquals;
 
 public class HyenaRecordCursorTest
 {
+    @Test
+    public void hashMapTest() {
+        int size = 10000000;
+        HashMap<Integer, Integer> map = new HashMap<>(size, 1);
+        long putMapTime = measureTimeMs(() ->
+        {
+            for (int i = 0; i < size; i++) {
+                map.put(i, i);
+            }
+        });
+        TreeMap<Integer, Integer> treeMap = new TreeMap<>();
+        long putTreeMapTime = measureTimeMs(() ->
+        {
+            for (int i = 0; i < size; i++) {
+                treeMap.put(i, i);
+            }
+        });
+        List<Integer> arrayList = new LinkedList<>();
+        long putListTime = measureTimeMs(() -> {
+            for (int i = 0; i < size; i++) {
+                arrayList.add(i);
+            }
+        });
+        int[] array = new int[size];
+        long putArrayTime = measureTimeMs(() -> {
+            for (int i = 0; i < size; i++) {
+                array[i] = i;
+            }
+        });
+        long readMapTime = measureTimeMs(() -> {
+            for (int i = 0; i < size; i++) {
+                map.get(i);
+            }
+        });
+        FastHashMap fastHashMap = new FastHashMap();
+        long fastHMPutTime = measureTimeMs(() -> {
+            for (int i = 0; i < size; i++) {
+                fastHashMap.put(i, i);
+            }
+        });
+        SparseArrayList<Integer> sparseArrayList = new SparseArrayList<>(size);
+        long putSparseListTime = measureTimeMs(() -> {
+            for (int i = 0; i < size; i++) {
+                sparseArrayList.add(i);
+            }
+        });
+
+//        long readSparseArrayList = measureTimeMs(() -> {
+//            for (int i = 0; i < size; i++) {
+//                sparseArrayList.indexOf(i);
+//            }
+//        });
+        System.out.println("Putting into HashMap " + size + " elements took " + putMapTime + "ms");
+        System.out.println("Putting into FastHashMap " + size + " elements took " + fastHMPutTime + "ms");
+        System.out.println("Putting into ArrayList " + size + " elements took " + putListTime + "ms");
+        System.out.println("Putting into SparseArrayList " + size + " elements took " + putSparseListTime + "ms");
+        System.out.println("Putting into TreeMap " + size + " elements took " + putTreeMapTime + "ms");
+        System.out.println("Putting into array " + size + " elements took " + putArrayTime + "ms");
+        System.out.println("Getting " + size + " elements from HashMap took " + readMapTime + "ms");
+//        System.out.println("Getting " + size + " elements from FastArrayList took " + readSparseArrayList + "ms");
+    }
+
+    @Test
+    public void kotlinTest() {
+        Testtt kotlinTest = new Testtt();
+        JavaTesttt javaTest = new JavaTesttt();
+        long iterations = 0;
+        long javaSumTime = 0;
+        long kotlinSumTime = 0;
+        long emptySumTime = 0;
+        do {
+            long startT = System.nanoTime();
+            javaTest.imDoingNothing();
+            long time = System.nanoTime() - startT;
+            javaSumTime += time;
+
+            startT = System.nanoTime();
+            kotlinTest.imDoingNothing();
+            time = System.nanoTime() - startT;
+            kotlinSumTime += time;
+
+            startT = System.nanoTime();
+            time = System.nanoTime() - startT;
+            emptySumTime += time;
+
+            iterations++;
+        } while (iterations < 100000000);
+        System.out.println("Java sum time: " + javaSumTime + "ns, avg: " + (javaSumTime/ (iterations + 1)) + "ns");
+        System.out.println("Kotlin sum time: " + kotlinSumTime + "ns, avg: " + (kotlinSumTime/ (iterations + 1)) + "ns");
+        System.out.println("No method sum time: " + emptySumTime + "ns, avg: " + (emptySumTime/ (iterations + 1)) + "ns");
+    }
+
+    @Test
+    public void javaTest() {
+        JavaTesttt test = new JavaTesttt();
+        long iterations = 0;
+        long sumTime = 0;
+        do {
+            long startT = System.nanoTime();
+            test.imDoingNothing();
+            long time = System.nanoTime() - startT;
+            sumTime += time;
+            iterations++;
+        } while (iterations < 100000);
+        System.out.println("Sum time: " + sumTime + "ns, avg: " + (sumTime/ (iterations + 1)) + "ns");
+    }
+
+    @Test
+    public void test() {
+        Slice slice = Slices.utf8Slice("dupa1211111111111113");
+//        measureTime(() -> slice.getByte(0));
+//        long getInt = measureTime(() -> slice.getInt(0));
+//        long getLong = measureTime(() -> slice.getLong(0));
+        long castInt = measureTimeNs(() -> {
+            long a = (long) slice.getInt(0);
+        });
+        long castInt2 = measureTimeNs(() -> {
+            long a = (long) slice.getInt(8);
+        });
+
+//        System.out.println("getting int: " + getInt + " nanos");
+//        System.out.println("getting long: " + getLong + " nanos");
+        System.out.println("getting int and casting to long: " + castInt + " nanos");
+        System.out.println("getting int and casting to long2: " + castInt2 + " nanos");
+    }
+
+    private long measureTimeNs(Runnable fun) {
+        long startT = System.nanoTime();
+        fun.run();
+        long endT = System.nanoTime();
+        return (endT - startT);
+    }
+
+    private long measureTimeMs(Runnable fun) {
+        long startT = System.currentTimeMillis();
+        fun.run();
+        long endT = System.currentTimeMillis();
+        return (endT - startT);
+    }
+
     public static class GetRowCount
     {
         HyenaRecordCursor cursor;

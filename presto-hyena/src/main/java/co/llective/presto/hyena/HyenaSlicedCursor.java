@@ -13,19 +13,14 @@
  */
 package co.llective.presto.hyena;
 
-import co.llective.hyena.api.Block;
-import co.llective.hyena.api.BlockHolder;
 import co.llective.hyena.api.BlockType;
-import co.llective.hyena.api.DataTriple;
-import co.llective.hyena.api.DenseBlock;
+import co.llective.hyena.api.MessageDecoder;
 import co.llective.hyena.api.ScanAndFilters;
 import co.llective.hyena.api.ScanComparison;
 import co.llective.hyena.api.ScanFilter;
 import co.llective.hyena.api.ScanOrFilters;
 import co.llective.hyena.api.ScanRequest;
-import co.llective.hyena.api.ScanResult;
-import co.llective.hyena.api.SparseBlock;
-import co.llective.hyena.api.StringBlock;
+import co.llective.hyena.api.ScanResultSlice;
 import co.llective.presto.hyena.types.U64Type;
 import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.predicate.TupleDomain;
@@ -33,11 +28,10 @@ import com.facebook.presto.spi.type.Type;
 import com.google.common.base.Joiner;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.StringUtils;
 
-import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,21 +42,20 @@ import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.airlift.slice.Slices.utf8Slice;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
-public class HyenaRecordCursor
+public class HyenaSlicedCursor
         implements RecordCursor
 {
-    private static final Logger log = Logger.get(HyenaRecordCursor.class);
+    private static final Logger log = Logger.get(HyenaSlicedCursor.class);
 
     private final List<HyenaColumnHandle> columns;
-    private final ScanResult result;
+    private final ScanResultSlice slicedResult;
     private int rowPosition = -1; // presto first advances next row and then fetch data
     private final int rowCount;
 
-    private Map<Integer, BlockHolder> fieldToBlockHolders = new HashMap<>();
+    private Map<Integer, MessageDecoder.SlicedColumn> fieldToSlicedColumns = new HashMap<>();
 
     private long constructorStart;
     private long constructorFinish;
@@ -70,12 +63,12 @@ public class HyenaRecordCursor
     private long scanFinish;
     private long iteratingStart;
 
-    public HyenaRecordCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
+    public HyenaSlicedCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
     {
         this(new HyenaPredicatesUtil(), hyenaSession, columns, predicate);
     }
 
-    public HyenaRecordCursor(HyenaPredicatesUtil predicateHandler, HyenaSession hyenaSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
+    public HyenaSlicedCursor(HyenaPredicatesUtil predicateHandler, HyenaSession hyenaSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
     {
         constructorStart = System.currentTimeMillis();
         this.columns = requireNonNull(columns, "columns is null");
@@ -99,26 +92,20 @@ public class HyenaRecordCursor
         remapSourceIdFilter(req);
 
         scanStart = System.currentTimeMillis();
-        result = hyenaSession.scan(req);
+        slicedResult = hyenaSession.scanToSlices(req);
         scanFinish = System.currentTimeMillis();
-        rowCount = getRowCount(result);
-        prepareBlockHolderMappings();
+        rowCount = getRowCount(slicedResult);
+        prepareSliceMappings();
 
         log.info("Received " + rowCount + " records");
         constructorFinish = System.currentTimeMillis();
     }
 
-    private void prepareBlockHolderMappings()
+    private void prepareSliceMappings()
     {
         for (int field = 0; field < columns.size(); field++) {
             long columnId = columns.get(field).getOrdinalPosition();
-            Optional<BlockHolder> optBlockHolder = this.result.getData().stream()
-                    .filter(triple -> triple.getColumnId() == columnId)
-                    .map(DataTriple::getData)
-                    .findFirst().orElse(Optional.empty());
-            if (optBlockHolder.isPresent()) {
-                fieldToBlockHolders.put(field, optBlockHolder.get());
-            }
+            fieldToSlicedColumns.put(field, this.slicedResult.getColumnMap().get(columnId));
         }
     }
 
@@ -174,44 +161,20 @@ public class HyenaRecordCursor
         }
     }
 
-    int getRowCount(ScanResult result)
+    int getRowCount(ScanResultSlice slicedResult)
     {
-        if (result.getData().isEmpty()) {
+        if (slicedResult.getColumnMap().isEmpty()) {
             return 0;
         }
 
         Optional<Long> sourceIdPosition = columns.stream().filter(x -> x.getColumnName().equals("source_id")).findFirst().map(
                 HyenaColumnHandle::getOrdinalPosition);
 
-        return result.getData().stream()
-                //TODO: Hyena doesn't support source_id column properly yet
-                .filter(triple -> {
-                    if (sourceIdPosition.isPresent()) {
-                        return triple.getColumnId() != sourceIdPosition.get();
-                    }
-                    return true;
-                })
-                //if dense block
-                .filter(x -> x.getColumnType().isDense())
-                .map(dt -> dt.getData().map(bh -> bh.getBlock().count()).orElse(0))
+        return slicedResult.getColumnMap().entrySet().stream()
+                .filter(entry -> sourceIdPosition.map(aLong -> !entry.getKey().equals(aLong)).orElse(true))
+                .map(x -> x.getValue().getElementsCount())
                 .findFirst()
-                // if no dense blocks then check sparse ones
-                .orElseGet(() ->
-                        result.getData().stream()
-                                //TODO: Hyena doesn't support source_id column properly yet
-                                .filter(triple -> {
-                                    if (sourceIdPosition.isPresent()) {
-                                        return triple.getColumnId() != sourceIdPosition.get();
-                                    }
-                                    return true;
-                                })
-                                .map(dt -> dt.getData().map(bh -> {
-                                    List<Integer> offsets = ((SparseBlock) bh.getBlock()).getOffsetData();
-                                    // last element of offset shows last non-null element of row
-                                    return offsets.get(offsets.size() - 1);
-                                }).orElse(0))
-                                // we're taking max count of all columns
-                                .max(Comparator.naturalOrder()).orElse(0));
+                .orElse(0);
     }
 
     @Override
@@ -259,43 +222,32 @@ public class HyenaRecordCursor
             return 1L;
         }
 
-        BlockHolder holder = getBlockHolderOrThrow(field);
-        Block block = holder.getBlock();
-//        long value = -1;
-//        long startT = System.nanoTime();
-        switch (holder.getType()) {
-            case I8Dense:
-                return ((DenseBlock<Byte>) block).getData().get(rowPosition).longValue();
-            case I16Dense:
-            case U8Dense:
-                return ((DenseBlock<Short>) block).getData().get(rowPosition).longValue();
-            case I32Dense:
-            case U16Dense:
-                return ((DenseBlock<Integer>) block).getData().get(rowPosition).longValue();
-            case I64Dense:
-            case U32Dense:
-                return ((DenseBlock<Long>) block).getData().get(rowPosition);
-            case U64Dense:
-                return ((DenseBlock<BigInteger>) block).getData().get(rowPosition).longValue();
-            case I8Sparse:
-                return ((SparseBlock<Byte>) block).getMaybe(rowPosition).get().longValue();
-            case I16Sparse:
-            case U8Sparse:
-                return ((SparseBlock<Short>) block).getMaybe(rowPosition).get().longValue();
-            case I32Sparse:
-            case U16Sparse:
-                return ((SparseBlock<Integer>) block).getMaybe(rowPosition).get().longValue();
-            case I64Sparse:
-            case U32Sparse:
-                return ((SparseBlock<Long>) block).getMaybe(rowPosition).get();
-            case U64Sparse:
-                return ((SparseBlock<BigInteger>) block).getMaybe(rowPosition).get().longValue();
+        MessageDecoder.SlicedColumn slicedColumn = getSlicedColumn(field);
+
+        switch(slicedColumn.getType()) {
+            case I128Dense:
+            case U128Dense:
+            case String:
+                throw new RuntimeException("Wrong type");
         }
+
+//        long startT = System.nanoTime();
+//        byte[] bytes = slicedColumn.getBytes(rowPosition, Long.BYTES);
+//        long endGB = System.nanoTime();
+//        long longa = Longs.fromByteArray(bytes);
 //        long endT = System.nanoTime();
-//        log.error("field: " + field + ", type: " + block.getType());
+//        log.error("field: " + field + ", type: " + slicedColumn.getType() + ", element size: " + slicedColumn.getElementBytesSize());
+//        log.error("getBytes time: " + (endGB - startT) + " nanos");
+//        log.error("bytesToLong time: " + (endT - endGB) + " nanos");
+
+//        long startT = System.nanoTime();
+//        long longa = slicedColumn.getLong(rowPosition);
+//        long endT = System.nanoTime();
+
+//        log.error("field: " + field + ", type: " + slicedColumn.getType() + ", element size: " + slicedColumn.getElementBytesSize());
 //        log.error("getLong: " + (endT - startT) + " ns");
-//        return value;
-        throw new RuntimeException("Bad type");
+//        return longa;
+        return slicedColumn.getLong(rowPosition);
     }
 
     @Override
@@ -308,20 +260,7 @@ public class HyenaRecordCursor
     @Override
     public Slice getSlice(int field)
     {
-        BlockHolder holder = getBlockHolderOrThrow(field);
-
-        if (holder.getType() != BlockType.String) {
-            throw new RuntimeException("Expected String block type. Found " + holder.getType().name() + " instead");
-        }
-
-        StringBlock block = (StringBlock) holder.getBlock();
-        Optional<String> value = block.getMaybe(rowPosition);
-        if (value.isPresent()) {
-            return utf8Slice(block.getMaybe(rowPosition).get());
-        }
-        else {
-            return null;
-        }
+        throw new NotImplementedException("Strings not implemented yet");
     }
 
     @Override
@@ -333,35 +272,16 @@ public class HyenaRecordCursor
     @Override
     public boolean isNull(int field)
     {
-        BlockHolder holder = getBlockHolderOrThrow(field);
-
-        switch (holder.getType()) {
-            case U64Sparse:
-            case U32Sparse:
-            case U16Sparse:
-            case U8Sparse:
-            case I64Sparse:
-            case I32Sparse:
-            case I16Sparse:
-            case I8Sparse:
-                SparseBlock sparseBlock = (SparseBlock) holder.getBlock();
-                return !sparseBlock.getMaybe(rowPosition).isPresent();
-            case String:
-                StringBlock stringBlock = (StringBlock) holder.getBlock();
-                return !stringBlock.getMaybe(rowPosition).isPresent();
-        }
-
-        return false;
+        return getSlicedColumn(field).isNull(rowPosition);
     }
 
-    private BlockHolder getBlockHolderOrThrow(int field)
+    private MessageDecoder.SlicedColumn getSlicedColumn(int field)
     {
-        BlockHolder blockHolder = fieldToBlockHolders.get(field);
-
-        if (blockHolder == null) {
+        MessageDecoder.SlicedColumn slicedColumn = fieldToSlicedColumns.get(field);
+        if (slicedColumn == null) {
             throw new RuntimeException("Empty block holder");
         }
-        return blockHolder;
+        return slicedColumn;
     }
 
     private void checkFieldType(int field, Type... expected)
@@ -384,9 +304,7 @@ public class HyenaRecordCursor
         log.warn("Scan + deserialization time: " + (scanFinish - scanStart) + "ms");
         log.warn("Constructor time: " + (constructorFinish - constructorStart) + "ms");
         log.warn("Iterating time: " + (closeTime - iteratingStart) + "ms");
-        if (rowPosition != 0) {
-            log.warn("Iterated through " + rowPosition + " rows, " + (iteratingTime / rowPosition) + "ms per row");
-        }
+        log.warn("Iterated through " + rowPosition + " rows, " + (iteratingTime / rowPosition) + "ms per row");
         log.warn("Whole cursor job: " + (closeTime - constructorStart) + "ms");
         //TODO: cancel query in hyenaAPI (send abort request with requestID)
     }

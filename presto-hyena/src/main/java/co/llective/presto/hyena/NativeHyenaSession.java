@@ -20,6 +20,7 @@ import co.llective.hyena.api.PartitionInfo;
 import co.llective.hyena.api.ReplyException;
 import co.llective.hyena.api.ScanRequest;
 import co.llective.hyena.api.ScanResult;
+import co.llective.hyena.api.ScanResultSlice;
 
 import java.io.IOException;
 import java.util.Comparator;
@@ -66,6 +67,17 @@ public class NativeHyenaSession
     {
         try {
             return hyenaApi.scan(req);
+        }
+        catch (IOException | ReplyException exc) {
+            throw new RuntimeException("Error while scanning", exc);
+        }
+    }
+
+    @Override
+    public ScanResultSlice scanToSlices(ScanRequest req)
+    {
+        try {
+            return hyenaApi.scanToSlices(req);
         }
         catch (IOException | ReplyException exc) {
             throw new RuntimeException("Error while scanning", exc);
