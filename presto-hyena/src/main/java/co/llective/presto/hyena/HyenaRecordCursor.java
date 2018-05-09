@@ -18,8 +18,10 @@ import co.llective.hyena.api.BlockHolder;
 import co.llective.hyena.api.BlockType;
 import co.llective.hyena.api.DataTriple;
 import co.llective.hyena.api.DenseBlock;
+import co.llective.hyena.api.ScanAndFilters;
 import co.llective.hyena.api.ScanComparison;
 import co.llective.hyena.api.ScanFilter;
+import co.llective.hyena.api.ScanOrFilters;
 import co.llective.hyena.api.ScanRequest;
 import co.llective.hyena.api.ScanResult;
 import co.llective.hyena.api.SparseBlock;
@@ -83,13 +85,13 @@ public class HyenaRecordCursor
         req.setMinTs(0);
         req.setMaxTs(Long.MAX_VALUE);
         req.setProjection(new ArrayList<>());
-        req.setFilters(new ArrayList<>());
+        req.setFilters(new ScanOrFilters());
 
         for (HyenaColumnHandle col : columns) {
             req.getProjection().add(col.getOrdinalPosition());
         }
 
-        List<ScanFilter> filters = predicateHandler.predicateToFilters(predicate);
+        ScanOrFilters filters = predicateHandler.predicateToFilters(predicate);
         req.getFilters().addAll(filters);
 
         log.info("Filters: " + StringUtils.join(req.getFilters(), ", "));
@@ -133,27 +135,43 @@ public class HyenaRecordCursor
             return;
         }
 
-        // if there is not filters
-        if (req.getFilters().size() == 0) {
+        // if there is no or filters
+        if (req.getFilters().isEmpty()) {
+            return;
+        }
+
+        // if there are or filters but all are empty
+        boolean areAndFilters = false;
+        for (ScanAndFilters andFilters : req.getFilters()) {
+            if (!andFilters.isEmpty()) {
+                areAndFilters = true;
+            }
+        }
+        if (!areAndFilters) {
             return;
         }
 
         // if there are filters but none of them is source_id one
-        if (req.getFilters().stream().allMatch(filter -> filter.getColumn() != sourceIdPosition.get())) {
+        if (req.getFilters().stream().allMatch(andFilters ->
+                andFilters.stream().allMatch(filter ->
+                        filter.getColumn() != sourceIdPosition.get()))) {
             return;
         }
 
-        if (req.getFilters().size() == 1) {
-            req.getFilters().removeIf(x -> x.getColumn() == sourceIdPosition.get());
-            // add tautology filter, u64 > 0
-            long timestampIndex = 0L;
-            if (!req.getProjection().contains(timestampIndex)) {
-                req.getProjection().add(timestampIndex);
+        for (ScanAndFilters andFilters : req.getFilters()) {
+            if (andFilters.size() == 1) {
+                andFilters.removeIf(x -> x.getColumn() == sourceIdPosition.get());
+                // add tautology filter, u64 > 0
+                long timestampIndex = 0L;
+                if (!req.getProjection().contains(timestampIndex)) {
+                    req.getProjection().add(timestampIndex);
+                }
+                andFilters.add(
+                        new ScanFilter(0, ScanComparison.Gt, BlockType.U64Dense.mapToFilterType(), timestampIndex, Optional.empty()));
             }
-            req.getFilters().add(new ScanFilter(0, ScanComparison.Gt, BlockType.U64Dense.mapToFilterType(), timestampIndex, Optional.empty()));
-        }
-        else {
-            req.getFilters().removeIf(x -> x.getColumn() == sourceIdPosition.get());
+            else {
+                andFilters.removeIf(x -> x.getColumn() == sourceIdPosition.get());
+            }
         }
     }
 
@@ -240,7 +258,7 @@ public class HyenaRecordCursor
     {
         checkFieldType(field, BIGINT, INTEGER, U64Type.U_64_TYPE);
 
-        // temporal workaround for not filled source_id by hyena (we only have packet_headers now)
+        // TODO: temporal workaround for not filled source_id by hyena (we only have packet_headers now)
         if (columns.get(field).getColumnName().equals("source_id")) {
             return 1L;
         }
