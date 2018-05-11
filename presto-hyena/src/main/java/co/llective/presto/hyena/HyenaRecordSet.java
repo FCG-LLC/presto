@@ -55,7 +55,6 @@ public class HyenaRecordSet
     @Override
     public RecordCursor cursor()
     {
-        return new HyenaSlicedCursor(hyenaSession, columns, effectivePredicate);
-//        return new HyenaRecordCursor(hyenaSession, columns, effectivePredicate);
+        return new HyenaRecordCursor(hyenaSession, columns, effectivePredicate);
     }
 }

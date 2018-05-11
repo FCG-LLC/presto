@@ -18,7 +18,6 @@ import co.llective.hyena.api.Column;
 import co.llective.hyena.api.PartitionInfo;
 import co.llective.hyena.api.ScanRequest;
 import co.llective.hyena.api.ScanResult;
-import co.llective.hyena.api.ScanResultSlice;
 
 import java.util.List;
 
@@ -31,6 +30,4 @@ public interface HyenaSession
     Catalog refreshCatalog();
 
     ScanResult scan(ScanRequest req);
-
-    ScanResultSlice scanToSlices(ScanRequest req);
 }
