@@ -13,21 +13,20 @@
  */
 package co.llective.presto.hyena;
 
-import co.llective.hyena.api.BlockHolder;
 import co.llective.hyena.api.BlockType;
-import co.llective.hyena.api.DataTriple;
-import co.llective.hyena.api.DenseBlock;
+import co.llective.hyena.api.ColumnValues;
+import co.llective.hyena.api.DenseColumn;
 import co.llective.hyena.api.ScanResult;
-import co.llective.hyena.api.SparseBlock;
+import co.llective.hyena.api.SparseColumn;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.IntegerType;
+import io.airlift.slice.Slices;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -49,7 +48,7 @@ public class HyenaRecordCursorTest
         @Test
         public void returnsZeroIfEmptyResult()
         {
-            ScanResult scanResult = new ScanResult(Collections.emptyList());
+            ScanResult scanResult = new ScanResult(new HashMap<>());
 
             assertEquals(0, cursor.getRowCount(scanResult));
         }
@@ -58,25 +57,24 @@ public class HyenaRecordCursorTest
         public void returnsSizeOfDenseWhenExists()
         {
             int size = 10;
-            DataTriple denseTriple = new DataTriple(0, BlockType.I16Dense, Optional.of(
-                    new BlockHolder(BlockType.I16Dense, nElementDenseBlock(size, 1))));
 
-            List<DataTriple> data = new ArrayList<>();
-            data.add(denseTriple);
+            ColumnValues column = new DenseColumn(BlockType.I16Dense, Slices.EMPTY_SLICE, size);
+
+            Map<Long, ColumnValues> data = new HashMap<>();
+            data.put(0L, column);
             ScanResult scanResult = new ScanResult(data);
 
             assertEquals(size, cursor.getRowCount(scanResult));
         }
 
         @Test
-        public void returnsLastIndexOfSparseWhenNoDense()
+        public void returnsSizeOfSparseWhenNoDense()
         {
             int size = 14;
-            DataTriple sparseTriple = new DataTriple(0, BlockType.I16Sparse, Optional.of(
-                    new BlockHolder(BlockType.I16Sparse, nElementSparseBlock(size, 1))));
 
-            List<DataTriple> data = new ArrayList<>();
-            data.add(sparseTriple);
+            ColumnValues column = new SparseColumn(BlockType.I16Sparse, Slices.EMPTY_SLICE, Slices.EMPTY_SLICE, size);
+            Map<Long, ColumnValues> data = new HashMap<>();
+            data.put(0L, column);
             ScanResult scanResult = new ScanResult(data);
 
             assertEquals(size, cursor.getRowCount(scanResult));
@@ -86,18 +84,18 @@ public class HyenaRecordCursorTest
         public void returnsGreaterSizeWhenMoreThanOneSparseColumn()
         {
             int smallerSize = 5;
-            int biggerSize = 10;
-            DataTriple smallerSparseType = new DataTriple(0, BlockType.I16Sparse, Optional.of(
-                    new BlockHolder(BlockType.I16Sparse, nElementSparseBlock(smallerSize, 1))));
-            DataTriple biggerSparseType = new DataTriple(0, BlockType.I16Sparse, Optional.of(
-                    new BlockHolder(BlockType.I16Sparse, nElementSparseBlock(biggerSize, 1))));
+            int greaterSize = 10;
 
-            List<DataTriple> data = new ArrayList<>();
-            data.add(smallerSparseType);
-            data.add(biggerSparseType);
+            ColumnValues smallerSparse = new SparseColumn(BlockType.I16Sparse, Slices.EMPTY_SLICE, Slices.EMPTY_SLICE, smallerSize);
+            ColumnValues greaterSparse = new SparseColumn(BlockType.I16Sparse, Slices.EMPTY_SLICE, Slices.EMPTY_SLICE, greaterSize);
+
+            Map<Long, ColumnValues> data = new HashMap<>();
+            data.put(0L, smallerSparse);
+            data.put(1L, greaterSparse);
+
             ScanResult scanResult = new ScanResult(data);
 
-            assertEquals(biggerSize, cursor.getRowCount(scanResult));
+            assertEquals(greaterSize, cursor.getRowCount(scanResult));
         }
 
         @Test
@@ -105,14 +103,14 @@ public class HyenaRecordCursorTest
         {
             int denseSize = 10;
             int sparseSize = 5;
-            DataTriple denseTriple = new DataTriple(0, BlockType.I16Dense, Optional.of(
-                    new BlockHolder(BlockType.I16Dense, nElementDenseBlock(denseSize, 1))));
-            DataTriple sparseTriple = new DataTriple(0, BlockType.I16Sparse, Optional.of(
-                    new BlockHolder(BlockType.I16Sparse, nElementSparseBlock(sparseSize, 1))));
 
-            List<DataTriple> data = new ArrayList<>();
-            data.add(denseTriple);
-            data.add(sparseTriple);
+            ColumnValues sparse = new SparseColumn(BlockType.I16Sparse, Slices.EMPTY_SLICE, Slices.EMPTY_SLICE, sparseSize);
+            ColumnValues dense = new DenseColumn(BlockType.I16Sparse, Slices.EMPTY_SLICE, denseSize);
+
+            Map<Long, ColumnValues> data = new HashMap<>();
+            data.put(0L, sparse);
+            data.put(1L, dense);
+
             ScanResult scanResult = new ScanResult(data);
 
             assertEquals(denseSize, cursor.getRowCount(scanResult));
@@ -121,26 +119,9 @@ public class HyenaRecordCursorTest
         private HyenaRecordCursor initHyenaRecordCursor()
         {
             HyenaSession hyenaSession = mock(HyenaSession.class);
-            when(hyenaSession.scan(any())).thenReturn(new ScanResult(Collections.emptyList()));
+            when(hyenaSession.scan(any())).thenReturn(new ScanResult(new HashMap<>()));
             HyenaColumnHandle handle = new HyenaColumnHandle("", IntegerType.INTEGER, BlockType.I16Sparse, 0);
             return new HyenaRecordCursor(hyenaSession, Collections.singletonList(handle), TupleDomain.all());
-        }
-
-        <T extends Number> DenseBlock<T> nElementDenseBlock(int n, T defVal)
-        {
-            DenseBlock<T> block = new DenseBlock<>(BlockType.I16Dense, n);
-            while (n > 0) {
-                block.add(defVal);
-                n--;
-            }
-            return block;
-        }
-
-        <T extends Number> SparseBlock<T> nElementSparseBlock(int n, T defVal)
-        {
-            SparseBlock<T> block = new SparseBlock<>(BlockType.I16Sparse, n);
-            block.add(n, defVal);
-            return block;
         }
     }
 }
