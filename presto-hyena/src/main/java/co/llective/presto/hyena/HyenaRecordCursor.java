@@ -21,7 +21,6 @@ import co.llective.hyena.api.ScanFilter;
 import co.llective.hyena.api.ScanOrFilters;
 import co.llective.hyena.api.ScanRequest;
 import co.llective.hyena.api.ScanResult;
-import co.llective.presto.hyena.types.U64Type;
 import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.Type;
@@ -39,10 +38,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static com.facebook.presto.spi.type.BigintType.BIGINT;
-import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
-import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
-import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -111,7 +106,7 @@ public class HyenaRecordCursor
         }
     }
 
-    void remapSourceIdFilter(ScanRequest req)
+    private void remapSourceIdFilter(ScanRequest req)
     {
         Optional<Long> sourceIdPosition = columns.stream()
                 .filter(x -> x.getColumnName().equals("source_id"))
@@ -212,15 +207,12 @@ public class HyenaRecordCursor
     @Override
     public boolean getBoolean(int field)
     {
-        checkFieldType(field, BOOLEAN);
-        return false;
+        throw new NotImplementedException("Booleans are not supported yet");
     }
 
     @Override
     public long getLong(int field)
     {
-        checkFieldType(field, BIGINT, INTEGER, U64Type.U_64_TYPE);
-
         // TODO: temporal workaround for not filled source_id by hyena (we only have packet_headers now)
         if (columns.get(field).getColumnName().equals("source_id")) {
             return 1L;
@@ -231,7 +223,7 @@ public class HyenaRecordCursor
         switch(column.getType()) {
             case I128Dense:
             case U128Dense:
-            case String:
+            case StringDense:
                 throw new RuntimeException("Wrong type");
         }
 
@@ -241,20 +233,19 @@ public class HyenaRecordCursor
     @Override
     public double getDouble(int field)
     {
-        checkFieldType(field, DOUBLE);
-        throw new UnsupportedOperationException();
+        throw new NotImplementedException("Doubles are not supported yet");
     }
 
     @Override
     public Slice getSlice(int field)
     {
-        throw new NotImplementedException("Strings not implemented yet");
+        return getColumn(field).getSlice(rowPosition);
     }
 
     @Override
     public Object getObject(int field)
     {
-        throw new UnsupportedOperationException();
+        throw new NotImplementedException("Objects are not supported yet");
     }
 
     @Override
