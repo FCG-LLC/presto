@@ -150,7 +150,7 @@ public class HyenaRecordCursor
                     req.getProjection().add(timestampIndex);
                 }
                 andFilters.add(
-                        new ScanFilter(0, ScanComparison.Gt, BlockType.U64Dense.mapToFilterType(), timestampIndex, Optional.empty()));
+                        new ScanFilter(0, ScanComparison.Gt, BlockType.U64Dense.mapToFilterType(), timestampIndex));
             }
             else {
                 andFilters.removeIf(x -> x.getColumn() == sourceIdPosition.get());
