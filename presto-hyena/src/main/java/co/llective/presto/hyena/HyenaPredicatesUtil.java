@@ -28,7 +28,6 @@ import io.airlift.slice.Slice;
 import org.apache.commons.lang3.NotImplementedException;
 
 import java.util.Map;
-import java.util.Optional;
 
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 
@@ -97,12 +96,10 @@ public class HyenaPredicatesUtil
     private ScanFilter createHighScanFilter(HyenaColumnHandle column, Marker high)
     {
         ScanComparison op = getRightBoundOp(high);
-        String stringValue = null;
         Object value;
 
         if (column.getColumnType() == VARCHAR) {
-            value = (Slice) high.getValue();
-            stringValue = ((Slice) high.getValue()).toStringUtf8();
+            value = ((Slice) high.getValue()).toStringUtf8();
         }
         else {
             value = (Long) high.getValue();
@@ -115,7 +112,7 @@ public class HyenaPredicatesUtil
                 }
             }
         }
-        return getNewScanFilter(column, op, value, stringValue);
+        return getNewScanFilter(column, op, value);
     }
 
     private ScanComparison getRightBoundOp(Marker high)
@@ -134,12 +131,10 @@ public class HyenaPredicatesUtil
     private ScanFilter createLowScanFilter(HyenaColumnHandle column, Marker low)
     {
         ScanComparison op = getLeftBoundOp(low);
-        String stringValue = null;
         Object value;
 
         if (column.getColumnType() == VARCHAR) {
-            value = (Slice) low.getValue();
-            stringValue = ((Slice) low.getValue()).toStringUtf8();
+            value = ((Slice) low.getValue()).toStringUtf8();
         }
         else {
             value = (Long) low.getValue();
@@ -152,7 +147,7 @@ public class HyenaPredicatesUtil
                 }
             }
         }
-        return getNewScanFilter(column, op, value, stringValue);
+        return getNewScanFilter(column, op, value);
     }
 
     private ScanComparison getLeftBoundOp(Marker low)
@@ -172,23 +167,21 @@ public class HyenaPredicatesUtil
         ScanAndFilters andFilters = new ScanAndFilters();
         if (column.getColumnType() == VARCHAR) {
             Slice val = (Slice) singleValue;
-            andFilters.add(getNewScanFilter(column, comparisonOperator, val, val.toStringUtf8()));
+            andFilters.add(getNewScanFilter(column, comparisonOperator, val.toStringUtf8()));
         }
         else {
             Long val = (Long) singleValue;
-            andFilters.add(getNewScanFilter(column, comparisonOperator, val, null));
+            andFilters.add(getNewScanFilter(column, comparisonOperator, val));
         }
         return andFilters;
     }
 
-    private ScanFilter getNewScanFilter(HyenaColumnHandle column, ScanComparison op, Object value, String stringValue)
+    private ScanFilter getNewScanFilter(HyenaColumnHandle column, ScanComparison op, Object value)
     {
-        Optional<String> stringOptional = stringValue == null ? Optional.of("") : Optional.of(stringValue);
         return new ScanFilter(
             column.getOrdinalPosition(),
             op,
             column.getHyenaType().mapToFilterType(),
-            value,
-            stringOptional);
+            value);
     }
 }
