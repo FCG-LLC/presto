@@ -15,9 +15,9 @@ package co.llective.presto.hyena;
 
 import co.llective.hyena.api.BlockType;
 import co.llective.hyena.api.ColumnValues;
-import co.llective.hyena.api.DenseColumn;
+import co.llective.hyena.api.DenseNumberColumn;
 import co.llective.hyena.api.ScanResult;
-import co.llective.hyena.api.SparseColumn;
+import co.llective.hyena.api.SparseNumberColumn;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.IntegerType;
 import io.airlift.slice.Slices;
@@ -58,7 +58,7 @@ public class HyenaRecordCursorTest
         {
             int size = 10;
 
-            ColumnValues column = new DenseColumn(BlockType.I16Dense, Slices.EMPTY_SLICE, size);
+            ColumnValues column = new DenseNumberColumn(BlockType.I16Dense, Slices.EMPTY_SLICE, size);
 
             Map<Long, ColumnValues> data = new HashMap<>();
             data.put(0L, column);
@@ -72,7 +72,7 @@ public class HyenaRecordCursorTest
         {
             int size = 14;
 
-            ColumnValues column = new SparseColumn(BlockType.I16Sparse, Slices.EMPTY_SLICE, Slices.EMPTY_SLICE, size);
+            ColumnValues column = new SparseNumberColumn(BlockType.I16Sparse, Slices.EMPTY_SLICE, Slices.EMPTY_SLICE, size);
             Map<Long, ColumnValues> data = new HashMap<>();
             data.put(0L, column);
             ScanResult scanResult = new ScanResult(data);
@@ -86,8 +86,8 @@ public class HyenaRecordCursorTest
             int smallerSize = 5;
             int greaterSize = 10;
 
-            ColumnValues smallerSparse = new SparseColumn(BlockType.I16Sparse, Slices.EMPTY_SLICE, Slices.EMPTY_SLICE, smallerSize);
-            ColumnValues greaterSparse = new SparseColumn(BlockType.I16Sparse, Slices.EMPTY_SLICE, Slices.EMPTY_SLICE, greaterSize);
+            ColumnValues smallerSparse = new SparseNumberColumn(BlockType.I16Sparse, Slices.EMPTY_SLICE, Slices.EMPTY_SLICE, smallerSize);
+            ColumnValues greaterSparse = new SparseNumberColumn(BlockType.I16Sparse, Slices.EMPTY_SLICE, Slices.EMPTY_SLICE, greaterSize);
 
             Map<Long, ColumnValues> data = new HashMap<>();
             data.put(0L, smallerSparse);
@@ -104,8 +104,8 @@ public class HyenaRecordCursorTest
             int denseSize = 10;
             int sparseSize = 5;
 
-            ColumnValues sparse = new SparseColumn(BlockType.I16Sparse, Slices.EMPTY_SLICE, Slices.EMPTY_SLICE, sparseSize);
-            ColumnValues dense = new DenseColumn(BlockType.I16Sparse, Slices.EMPTY_SLICE, denseSize);
+            ColumnValues sparse = new SparseNumberColumn(BlockType.I16Sparse, Slices.EMPTY_SLICE, Slices.EMPTY_SLICE, sparseSize);
+            ColumnValues dense = new DenseNumberColumn(BlockType.I16Sparse, Slices.EMPTY_SLICE, denseSize);
 
             Map<Long, ColumnValues> data = new HashMap<>();
             data.put(0L, sparse);
