@@ -92,7 +92,6 @@ public class TestQueryStateMachine
 
     @Test
     public void testBasicStateChanges()
-            throws InterruptedException
     {
         QueryStateMachine stateMachine = createQueryStateMachine();
         assertState(stateMachine, QUEUED);
@@ -113,7 +112,6 @@ public class TestQueryStateMachine
 
     @Test
     public void testQueued()
-            throws InterruptedException
     {
         QueryStateMachine stateMachine = createQueryStateMachine();
         assertState(stateMachine, QUEUED);
@@ -141,7 +139,6 @@ public class TestQueryStateMachine
 
     @Test
     public void testPlanning()
-            throws InterruptedException
     {
         QueryStateMachine stateMachine = createQueryStateMachine();
         assertTrue(stateMachine.transitionToPlanning());
@@ -172,7 +169,6 @@ public class TestQueryStateMachine
 
     @Test
     public void testStarting()
-            throws InterruptedException
     {
         QueryStateMachine stateMachine = createQueryStateMachine();
         assertTrue(stateMachine.transitionToStarting());
@@ -201,7 +197,6 @@ public class TestQueryStateMachine
 
     @Test
     public void testRunning()
-            throws InterruptedException
     {
         QueryStateMachine stateMachine = createQueryStateMachine();
         assertTrue(stateMachine.transitionToRunning());
@@ -228,7 +223,6 @@ public class TestQueryStateMachine
 
     @Test
     public void testFinished()
-            throws InterruptedException
     {
         QueryStateMachine stateMachine = createQueryStateMachine();
         assertTrue(stateMachine.transitionToFinishing());
@@ -254,7 +248,6 @@ public class TestQueryStateMachine
 
     @Test
     public void testPlanningTimeDuration()
-            throws InterruptedException
     {
         TestingTicker mockTicker = new TestingTicker();
         QueryStateMachine stateMachine = createQueryStateMachineWithTicker(mockTicker);
@@ -280,6 +273,32 @@ public class TestQueryStateMachine
         QueryStats queryStats = stateMachine.getQueryInfo(Optional.empty()).getQueryStats();
         assertTrue(queryStats.getQueuedTime().toMillis() == 100);
         assertTrue(queryStats.getTotalPlanningTime().toMillis() == 500);
+    }
+
+    @Test
+    public void testUpdateMemoryUsage()
+    {
+        QueryStateMachine stateMachine = createQueryStateMachine();
+
+        stateMachine.updateMemoryUsage(5, 10, 3);
+        assertEquals(stateMachine.getPeakUserMemoryInBytes(), 5);
+        assertEquals(stateMachine.getPeakTotalMemoryInBytes(), 10);
+        assertEquals(stateMachine.getPeakTaskTotalMemory(), 3);
+
+        stateMachine.updateMemoryUsage(0, 0, 2);
+        assertEquals(stateMachine.getPeakUserMemoryInBytes(), 5);
+        assertEquals(stateMachine.getPeakTotalMemoryInBytes(), 10);
+        assertEquals(stateMachine.getPeakTaskTotalMemory(), 3);
+
+        stateMachine.updateMemoryUsage(1, 1, 5);
+        assertEquals(stateMachine.getPeakUserMemoryInBytes(), 6);
+        assertEquals(stateMachine.getPeakTotalMemoryInBytes(), 11);
+        assertEquals(stateMachine.getPeakTaskTotalMemory(), 5);
+
+        stateMachine.updateMemoryUsage(3, 3, 2);
+        assertEquals(stateMachine.getPeakUserMemoryInBytes(), 9);
+        assertEquals(stateMachine.getPeakTotalMemoryInBytes(), 14);
+        assertEquals(stateMachine.getPeakTaskTotalMemory(), 5);
     }
 
     private static void assertFinalState(QueryStateMachine stateMachine, QueryState expectedState)

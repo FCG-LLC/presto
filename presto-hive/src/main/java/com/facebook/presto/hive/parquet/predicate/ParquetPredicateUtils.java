@@ -56,6 +56,7 @@ import static com.google.common.base.Verify.verify;
 import static io.airlift.slice.Slices.wrappedBuffer;
 import static java.lang.Math.toIntExact;
 import static java.util.Map.Entry;
+import static org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category.PRIMITIVE;
 import static parquet.column.Encoding.BIT_PACKED;
 import static parquet.column.Encoding.PLAIN_DICTIONARY;
 import static parquet.column.Encoding.RLE;
@@ -83,7 +84,13 @@ public final class ParquetPredicateUtils
 
         ImmutableMap.Builder<ColumnDescriptor, Domain> predicate = ImmutableMap.builder();
         for (Entry<HiveColumnHandle, Domain> entry : effectivePredicate.getDomains().get().entrySet()) {
-            Optional<RichColumnDescriptor> descriptor = getDescriptor(fileSchema, requestedSchema, ImmutableList.of(entry.getKey().getName()));
+            HiveColumnHandle columnHandle = entry.getKey();
+            // skip looking up predicates for complex types as Parquet only stores stats for primitives
+            if (!columnHandle.getHiveType().getCategory().equals(PRIMITIVE)) {
+                continue;
+            }
+
+            Optional<RichColumnDescriptor> descriptor = getDescriptor(fileSchema, requestedSchema, ImmutableList.of(columnHandle.getName()));
             if (descriptor.isPresent()) {
                 predicate.put(descriptor.get(), entry.getValue());
             }
@@ -137,15 +144,11 @@ public final class ParquetPredicateUtils
             if (descriptor.isPresent()) {
                 ColumnDescriptor columnDescriptor = descriptor.get();
                 if (isOnlyDictionaryEncodingPages(columnMetaData.getEncodings()) && isColumnPredicate(columnDescriptor, parquetTupleDomain)) {
-                    try {
-                        int totalSize = toIntExact(columnMetaData.getTotalSize());
-                        byte[] buffer = new byte[totalSize];
-                        dataSource.readFully(columnMetaData.getStartingPos(), buffer);
-                        Optional<ParquetDictionaryPage> dictionaryPage = readDictionaryPage(buffer, columnMetaData.getCodec());
-                        dictionaries.put(columnDescriptor, new ParquetDictionaryDescriptor(columnDescriptor, dictionaryPage));
-                    }
-                    catch (IOException ignored) {
-                    }
+                    int totalSize = toIntExact(columnMetaData.getTotalSize());
+                    byte[] buffer = new byte[totalSize];
+                    dataSource.readFully(columnMetaData.getStartingPos(), buffer);
+                    Optional<ParquetDictionaryPage> dictionaryPage = readDictionaryPage(buffer, columnMetaData.getCodec());
+                    dictionaries.put(columnDescriptor, new ParquetDictionaryDescriptor(columnDescriptor, dictionaryPage));
                     break;
                 }
             }

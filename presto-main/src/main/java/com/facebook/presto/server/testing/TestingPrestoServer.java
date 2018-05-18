@@ -15,7 +15,7 @@ package com.facebook.presto.server.testing;
 
 import com.facebook.presto.connector.ConnectorId;
 import com.facebook.presto.connector.ConnectorManager;
-import com.facebook.presto.cost.CostCalculator;
+import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.eventlistener.EventListenerManager;
 import com.facebook.presto.execution.QueryManager;
 import com.facebook.presto.execution.TaskManager;
@@ -33,6 +33,7 @@ import com.facebook.presto.server.GracefulShutdownHandler;
 import com.facebook.presto.server.PluginManager;
 import com.facebook.presto.server.ServerMainModule;
 import com.facebook.presto.server.ShutdownAction;
+import com.facebook.presto.server.security.ServerSecurityModule;
 import com.facebook.presto.spi.Node;
 import com.facebook.presto.spi.Plugin;
 import com.facebook.presto.split.SplitManager;
@@ -44,11 +45,11 @@ import com.facebook.presto.testing.TestingEventListenerManager;
 import com.facebook.presto.transaction.TransactionManager;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.net.HostAndPort;
 import com.google.inject.Injector;
+import com.google.inject.Key;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
 import io.airlift.bootstrap.Bootstrap;
@@ -86,6 +87,7 @@ import java.util.concurrent.CountDownLatch;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.nullToEmpty;
+import static com.google.common.base.Throwables.throwIfUnchecked;
 import static com.google.common.io.MoreFiles.deleteRecursively;
 import static com.google.common.io.RecursiveDeleteOption.ALLOW_INSECURE;
 import static io.airlift.discovery.client.ServiceAnnouncement.serviceAnnouncement;
@@ -97,6 +99,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 public class TestingPrestoServer
         implements Closeable
 {
+    private final Injector injector;
     private final Path baseDataDir;
     private final LifeCycleManager lifeCycleManager;
     private final PluginManager pluginManager;
@@ -105,7 +108,7 @@ public class TestingPrestoServer
     private final CatalogManager catalogManager;
     private final TransactionManager transactionManager;
     private final Metadata metadata;
-    private final CostCalculator costCalculator;
+    private final StatsCalculator statsCalculator;
     private final TestingAccessControlManager accessControl;
     private final ProcedureTester procedureTester;
     private final Optional<InternalResourceGroupManager> resourceGroupManager;
@@ -204,6 +207,7 @@ public class TestingPrestoServer
                 .add(new TestingJmxModule())
                 .add(new EventModule())
                 .add(new TraceTokenModule())
+                .add(new ServerSecurityModule())
                 .add(new ServerMainModule(parserOptions))
                 .add(binder -> {
                     binder.bind(TestingAccessControlManager.class).in(Scopes.SINGLETON);
@@ -234,7 +238,7 @@ public class TestingPrestoServer
             optionalProperties.put("node.environment", environment);
         }
 
-        Injector injector = app
+        injector = app
                 .strictConfig()
                 .doNotInitializeLogging()
                 .setRequiredConfigurationProperties(serverProperties.build())
@@ -256,7 +260,7 @@ public class TestingPrestoServer
         catalogManager = injector.getInstance(CatalogManager.class);
         transactionManager = injector.getInstance(TransactionManager.class);
         metadata = injector.getInstance(Metadata.class);
-        costCalculator = injector.getInstance(CostCalculator.class);
+        statsCalculator = injector.getInstance(StatsCalculator.class);
         accessControl = injector.getInstance(TestingAccessControlManager.class);
         procedureTester = injector.getInstance(ProcedureTester.class);
         splitManager = injector.getInstance(SplitManager.class);
@@ -293,7 +297,8 @@ public class TestingPrestoServer
             }
         }
         catch (Exception e) {
-            throw Throwables.propagate(e);
+            throwIfUnchecked(e);
+            throw new RuntimeException(e);
         }
         finally {
             if (isDirectory(baseDataDir)) {
@@ -344,6 +349,12 @@ public class TestingPrestoServer
         return HostAndPort.fromParts(getBaseUrl().getHost(), getBaseUrl().getPort());
     }
 
+    public HostAndPort getHttpsAddress()
+    {
+        URI httpsUri = server.getHttpServerInfo().getHttpsUri();
+        return HostAndPort.fromParts(httpsUri.getHost(), httpsUri.getPort());
+    }
+
     public CatalogManager getCatalogManager()
     {
         return catalogManager;
@@ -359,9 +370,9 @@ public class TestingPrestoServer
         return metadata;
     }
 
-    public CostCalculator getCostCalculator()
+    public StatsCalculator getStatsCalculator()
     {
-        return costCalculator;
+        return statsCalculator;
     }
 
     public TestingAccessControlManager getAccessControl()
@@ -430,6 +441,11 @@ public class TestingPrestoServer
     public Set<Node> getActiveNodesWithConnector(ConnectorId connectorId)
     {
         return nodeManager.getActiveConnectorNodes(connectorId);
+    }
+
+    public <T> T getInstance(Key<T> key)
+    {
+        return injector.getInstance(key);
     }
 
     private static void updateConnectorIdAnnouncement(Announcer announcer, ConnectorId connectorId)

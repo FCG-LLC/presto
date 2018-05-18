@@ -36,6 +36,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.concurrent.SetThreadName;
 import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
+import io.airlift.units.Duration;
 import org.joda.time.DateTime;
 
 import javax.annotation.Nullable;
@@ -57,6 +58,7 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.airlift.units.DataSize.succinctBytes;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public class SqlTask
 {
@@ -98,7 +100,14 @@ public class SqlTask
         requireNonNull(onDone, "onDone is null");
         requireNonNull(maxBufferSize, "maxBufferSize is null");
 
-        outputBuffer = new LazyOutputBuffer(taskId, taskInstanceId, taskNotificationExecutor, maxBufferSize, new UpdateSystemMemory(queryContext, taskId));
+        outputBuffer = new LazyOutputBuffer(
+                taskId,
+                taskInstanceId,
+                taskNotificationExecutor,
+                maxBufferSize,
+                // Pass a memory context supplier instead of a memory context to the output buffer,
+                // because we haven't created the task context that holds the the memory context yet.
+                () -> queryContext.getTaskContextByTaskId(taskId).localSystemMemoryContext());
         taskStateMachine = new TaskStateMachine(taskId, taskNotificationExecutor);
         taskStateMachine.addStateChangeListener(new StateChangeListener<TaskState>()
         {
@@ -145,34 +154,6 @@ public class SqlTask
     public boolean isOutputBufferOverutilized()
     {
         return outputBuffer.isOverutilized();
-    }
-
-    private static final class UpdateSystemMemory
-            implements SystemMemoryUsageListener
-    {
-        private final QueryContext queryContext;
-        private final TaskId taskId;
-        private TaskContext taskContext;
-
-        public UpdateSystemMemory(QueryContext queryContext, TaskId taskId)
-        {
-            this.queryContext = requireNonNull(queryContext, "queryContext is null");
-            this.taskId = requireNonNull(taskId, "taskId is null");
-        }
-
-        @Override
-        public void updateSystemMemoryUsage(long deltaMemoryInBytes)
-        {
-            if (taskContext == null) {
-                taskContext = queryContext.getTaskContextByTaskId(taskId);
-            }
-            if (deltaMemoryInBytes > 0) {
-                taskContext.reserveSystemMemory(deltaMemoryInBytes);
-            }
-            else {
-                taskContext.freeSystemMemory(-deltaMemoryInBytes);
-            }
-        }
     }
 
     public SqlTaskIoStats getIoStats()
@@ -224,15 +205,21 @@ public class SqlTask
         int queuedPartitionedDrivers = 0;
         int runningPartitionedDrivers = 0;
         DataSize physicalWrittenDataSize = new DataSize(0, BYTE);
-        DataSize memoryReservation = new DataSize(0, BYTE);
+        DataSize userMemoryReservation = new DataSize(0, BYTE);
+        DataSize systemMemoryReservation = new DataSize(0, BYTE);
         // TODO: add a mechanism to avoid sending the whole completedDriverGroups set over the wire for every task status reply
         Set<Lifespan> completedDriverGroups = ImmutableSet.of();
+        long fullGcCount = 0;
+        Duration fullGcTime = new Duration(0, MILLISECONDS);
         if (taskHolder.getFinalTaskInfo() != null) {
             TaskStats taskStats = taskHolder.getFinalTaskInfo().getStats();
             queuedPartitionedDrivers = taskStats.getQueuedPartitionedDrivers();
             runningPartitionedDrivers = taskStats.getRunningPartitionedDrivers();
             physicalWrittenDataSize = taskStats.getPhysicalWrittenDataSize();
-            memoryReservation = taskStats.getMemoryReservation();
+            userMemoryReservation = taskStats.getUserMemoryReservation();
+            systemMemoryReservation = taskStats.getSystemMemoryReservation();
+            fullGcCount = taskStats.getFullGcCount();
+            fullGcTime = taskStats.getFullGcTime();
         }
         else if (taskHolder.getTaskExecution() != null) {
             long physicalWrittenBytes = 0;
@@ -244,8 +231,11 @@ public class SqlTask
                 physicalWrittenBytes += pipelineContext.getPhysicalWrittenDataSize();
             }
             physicalWrittenDataSize = succinctBytes(physicalWrittenBytes);
-            memoryReservation = taskContext.getMemoryReservation();
+            userMemoryReservation = taskContext.getMemoryReservation();
+            systemMemoryReservation = taskContext.getSystemMemoryReservation();
             completedDriverGroups = taskContext.getCompletedDriverGroups();
+            fullGcCount = taskContext.getFullGcCount();
+            fullGcTime = taskContext.getFullGcTime();
         }
 
         return new TaskStatus(taskStateMachine.getTaskId(),
@@ -260,7 +250,10 @@ public class SqlTask
                 runningPartitionedDrivers,
                 isOutputBufferOverutilized(),
                 physicalWrittenDataSize,
-                memoryReservation);
+                userMemoryReservation,
+                systemMemoryReservation,
+                fullGcCount,
+                fullGcTime);
     }
 
     private TaskStats getTaskStats(TaskHolder taskHolder)
@@ -381,6 +374,13 @@ public class SqlTask
         checkArgument(maxSize.toBytes() > 0, "maxSize must be at least 1 byte");
 
         return outputBuffer.get(bufferId, startingSequenceId, maxSize);
+    }
+
+    public void acknowledgeTaskResults(OutputBufferId bufferId, long sequenceId)
+    {
+        requireNonNull(bufferId, "bufferId is null");
+
+        outputBuffer.acknowledge(bufferId, sequenceId);
     }
 
     public TaskInfo abortTaskResults(OutputBufferId bufferId)

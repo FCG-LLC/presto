@@ -13,6 +13,9 @@
  */
 package com.facebook.presto.sql.analyzer;
 
+import com.facebook.presto.operator.aggregation.arrayagg.ArrayAggGroupImplementation;
+import com.facebook.presto.operator.aggregation.histogram.HistogramGroupImplementation;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import io.airlift.configuration.Config;
@@ -22,6 +25,7 @@ import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.airlift.units.MaxDataSize;
 
+import javax.validation.constraints.AssertTrue;
 import javax.validation.constraints.DecimalMax;
 import javax.validation.constraints.DecimalMin;
 import javax.validation.constraints.Min;
@@ -38,14 +42,25 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 
 @DefunctConfig({
         "resource-group-manager",
+        "experimental.resource-groups-enabled",
         "experimental-syntax-enabled",
         "analyzer.experimental-syntax-enabled",
         "optimizer.processing-optimization"})
 public class FeaturesConfig
 {
+    @VisibleForTesting
+    static final String SPILL_ENABLED = "experimental.spill-enabled";
+    @VisibleForTesting
+    static final String SPILLER_SPILL_PATH = "experimental.spiller-spill-path";
+
+    private double cpuCostWeight = 75;
+    private double memoryCostWeight = 10;
+    private double networkCostWeight = 15;
     private boolean distributedIndexJoinsEnabled;
     private boolean distributedJoinsEnabled = true;
     private boolean colocatedJoinsEnabled;
+    private boolean groupedExecutionForAggregationEnabled;
+    private boolean spatialJoinsEnabled = true;
     private boolean fastInequalityJoins = true;
     private boolean reorderJoins = true;
     private boolean redistributeWrites = true;
@@ -53,49 +68,81 @@ public class FeaturesConfig
     private DataSize writerMinSize = new DataSize(32, DataSize.Unit.MEGABYTE);
     private boolean optimizeMetadataQueries;
     private boolean optimizeHashGeneration = true;
-    private boolean optimizeSingleDistinct = true;
     private boolean enableIntermediateAggregations;
     private boolean pushTableWriteThroughUnion = true;
     private boolean exchangeCompressionEnabled;
     private boolean legacyArrayAgg;
+    private boolean legacyLogFunction;
     private boolean legacyOrderBy;
+    private boolean groupByUsesEqualTo;
     private boolean legacyTimestamp = true;
     private boolean legacyMapSubscript;
+    private boolean legacyRoundNBigint;
+    private boolean legacyJoinUsing;
+    private boolean legacyRowFieldOrdinalAccess;
     private boolean optimizeMixedDistinctAggregations;
     private boolean forceSingleNodeOutput = true;
     private boolean pagesIndexEagerCompactionEnabled;
 
     private boolean dictionaryAggregation;
-    private boolean resourceGroups;
 
     private int re2JDfaStatesLimit = Integer.MAX_VALUE;
     private int re2JDfaRetries = 5;
     private RegexLibrary regexLibrary = JONI;
+    private HistogramGroupImplementation histogramGroupImplementation = HistogramGroupImplementation.NEW;
+    private ArrayAggGroupImplementation arrayAggGroupImplementation = ArrayAggGroupImplementation.NEW;
     private boolean spillEnabled;
     private DataSize aggregationOperatorUnspillMemoryLimit = new DataSize(4, DataSize.Unit.MEGABYTE);
     private List<Path> spillerSpillPaths = ImmutableList.of();
     private int spillerThreads = 4;
     private double spillMaxUsedSpaceThreshold = 0.9;
     private boolean iterativeOptimizerEnabled = true;
+    private boolean enableNewStatsCalculator;
     private boolean pushAggregationThroughJoin = true;
     private double memoryRevokingTarget = 0.5;
     private double memoryRevokingThreshold = 0.9;
-    private boolean parseDecimalLiteralsAsDouble = true;
+    private boolean parseDecimalLiteralsAsDouble;
+    private boolean useMarkDistinct = true;
+    private boolean preferPartialAggregation = true;
 
     private Duration iterativeOptimizerTimeout = new Duration(3, MINUTES); // by default let optimizer wait a long time in case it retrieves some data from ConnectorMetadata
 
     private DataSize filterAndProjectMinOutputPageSize = new DataSize(25, KILOBYTE);
     private int filterAndProjectMinOutputPageRowCount = 256;
 
-    public boolean isResourceGroupsEnabled()
+    public double getCpuCostWeight()
     {
-        return resourceGroups;
+        return cpuCostWeight;
     }
 
-    @Config("experimental.resource-groups-enabled")
-    public FeaturesConfig setResourceGroupsEnabled(boolean enabled)
+    @Config("cpu-cost-weight")
+    public FeaturesConfig setCpuCostWeight(double cpuCostWeight)
     {
-        resourceGroups = enabled;
+        this.cpuCostWeight = cpuCostWeight;
+        return this;
+    }
+
+    public double getMemoryCostWeight()
+    {
+        return memoryCostWeight;
+    }
+
+    @Config("memory-cost-weight")
+    public FeaturesConfig setMemoryCostWeight(double memoryCostWeight)
+    {
+        this.memoryCostWeight = memoryCostWeight;
+        return this;
+    }
+
+    public double getNetworkCostWeight()
+    {
+        return networkCostWeight;
+    }
+
+    @Config("network-cost-weight")
+    public FeaturesConfig setNetworkCostWeight(double networkCostWeight)
+    {
+        this.networkCostWeight = networkCostWeight;
         return this;
     }
 
@@ -116,6 +163,42 @@ public class FeaturesConfig
         return distributedJoinsEnabled;
     }
 
+    @Config("deprecated.legacy-round-n-bigint")
+    public FeaturesConfig setLegacyRoundNBigint(boolean legacyRoundNBigint)
+    {
+        this.legacyRoundNBigint = legacyRoundNBigint;
+        return this;
+    }
+
+    public boolean isLegacyRoundNBigint()
+    {
+        return legacyRoundNBigint;
+    }
+
+    @Config("deprecated.legacy-join-using")
+    public FeaturesConfig setLegacyJoinUsing(boolean value)
+    {
+        this.legacyJoinUsing = value;
+        return this;
+    }
+
+    public boolean isLegacyJoinUsing()
+    {
+        return legacyJoinUsing;
+    }
+
+    @Config("deprecated.legacy-row-field-ordinal-access")
+    public FeaturesConfig setLegacyRowFieldOrdinalAccess(boolean value)
+    {
+        this.legacyRowFieldOrdinalAccess = value;
+        return this;
+    }
+
+    public boolean isLegacyRowFieldOrdinalAccess()
+    {
+        return legacyRowFieldOrdinalAccess;
+    }
+
     @Config("deprecated.legacy-array-agg")
     public FeaturesConfig setLegacyArrayAgg(boolean legacyArrayAgg)
     {
@@ -128,6 +211,18 @@ public class FeaturesConfig
         return legacyArrayAgg;
     }
 
+    @Config("deprecated.legacy-log-function")
+    public FeaturesConfig setLegacyLogFunction(boolean value)
+    {
+        this.legacyLogFunction = value;
+        return this;
+    }
+
+    public boolean isLegacyLogFunction()
+    {
+        return legacyLogFunction;
+    }
+
     @Config("deprecated.legacy-order-by")
     public FeaturesConfig setLegacyOrderBy(boolean value)
     {
@@ -138,6 +233,18 @@ public class FeaturesConfig
     public boolean isLegacyOrderBy()
     {
         return legacyOrderBy;
+    }
+
+    @Config("deprecated.group-by-uses-equal")
+    public FeaturesConfig setGroupByUsesEqualTo(boolean value)
+    {
+        this.groupByUsesEqualTo = value;
+        return this;
+    }
+
+    public boolean isGroupByUsesEqualTo()
+    {
+        return groupByUsesEqualTo;
     }
 
     @Config("deprecated.legacy-timestamp")
@@ -171,6 +278,19 @@ public class FeaturesConfig
         return this;
     }
 
+    public boolean isGroupedExecutionForAggregationEnabled()
+    {
+        return groupedExecutionForAggregationEnabled;
+    }
+
+    @Config("grouped-execution-for-aggregation-enabled")
+    @ConfigDescription("Experimental: Use grouped execution for aggregation when possible")
+    public FeaturesConfig setGroupedExecutionForAggregationEnabled(boolean groupedExecutionForAggregationEnabled)
+    {
+        this.groupedExecutionForAggregationEnabled = groupedExecutionForAggregationEnabled;
+        return this;
+    }
+
     public boolean isColocatedJoinsEnabled()
     {
         return colocatedJoinsEnabled;
@@ -181,6 +301,19 @@ public class FeaturesConfig
     public FeaturesConfig setColocatedJoinsEnabled(boolean colocatedJoinsEnabled)
     {
         this.colocatedJoinsEnabled = colocatedJoinsEnabled;
+        return this;
+    }
+
+    public boolean isSpatialJoinsEnabled()
+    {
+        return spatialJoinsEnabled;
+    }
+
+    @Config("spatial-joins-enabled")
+    @ConfigDescription("Use spatial index for spatial joins when possible")
+    public FeaturesConfig setSpatialJoinsEnabled(boolean spatialJoinsEnabled)
+    {
+        this.spatialJoinsEnabled = spatialJoinsEnabled;
         return this;
     }
 
@@ -260,6 +393,30 @@ public class FeaturesConfig
         return this;
     }
 
+    public boolean isUseMarkDistinct()
+    {
+        return useMarkDistinct;
+    }
+
+    @Config("optimizer.use-mark-distinct")
+    public FeaturesConfig setUseMarkDistinct(boolean value)
+    {
+        this.useMarkDistinct = value;
+        return this;
+    }
+
+    public boolean isPreferPartialAggregation()
+    {
+        return preferPartialAggregation;
+    }
+
+    @Config("optimizer.prefer-partial-aggregation")
+    public FeaturesConfig setPreferPartialAggregation(boolean value)
+    {
+        this.preferPartialAggregation = value;
+        return this;
+    }
+
     public boolean isOptimizeHashGeneration()
     {
         return optimizeHashGeneration;
@@ -269,18 +426,6 @@ public class FeaturesConfig
     public FeaturesConfig setOptimizeHashGeneration(boolean optimizeHashGeneration)
     {
         this.optimizeHashGeneration = optimizeHashGeneration;
-        return this;
-    }
-
-    public boolean isOptimizeSingleDistinct()
-    {
-        return optimizeSingleDistinct;
-    }
-
-    @Config("optimizer.optimize-single-distinct")
-    public FeaturesConfig setOptimizeSingleDistinct(boolean optimizeSingleDistinct)
-    {
-        this.optimizeSingleDistinct = optimizeSingleDistinct;
         return this;
     }
 
@@ -351,7 +496,7 @@ public class FeaturesConfig
         return spillEnabled;
     }
 
-    @Config("experimental.spill-enabled")
+    @Config(SPILL_ENABLED)
     public FeaturesConfig setSpillEnabled(boolean spillEnabled)
     {
         this.spillEnabled = spillEnabled;
@@ -382,6 +527,18 @@ public class FeaturesConfig
         return this;
     }
 
+    public boolean isEnableNewStatsCalculator()
+    {
+        return enableNewStatsCalculator;
+    }
+
+    @Config("experimental.enable-new-stats-calculator")
+    public FeaturesConfig setEnableNewStatsCalculator(boolean enableNewStatsCalculator)
+    {
+        this.enableNewStatsCalculator = enableNewStatsCalculator;
+        return this;
+    }
+
     public DataSize getAggregationOperatorUnspillMemoryLimit()
     {
         return aggregationOperatorUnspillMemoryLimit;
@@ -399,7 +556,7 @@ public class FeaturesConfig
         return spillerSpillPaths;
     }
 
-    @Config("experimental.spiller-spill-path")
+    @Config(SPILLER_SPILL_PATH)
     public FeaturesConfig setSpillerSpillPaths(String spillPaths)
     {
         List<String> spillPathsSplit = ImmutableList.copyOf(Splitter.on(",").trimResults().omitEmptyStrings().split(spillPaths));
@@ -407,6 +564,13 @@ public class FeaturesConfig
         return this;
     }
 
+    @AssertTrue(message = SPILLER_SPILL_PATH + " must be configured when " + SPILL_ENABLED + " is set to true")
+    public boolean isSpillerSpillPathsConfiguredIfSpillEnabled()
+    {
+        return !isSpillEnabled() || !spillerSpillPaths.isEmpty();
+    }
+
+    @Min(1)
     public int getSpillerThreads()
     {
         return spillerThreads;
@@ -568,6 +732,30 @@ public class FeaturesConfig
     public FeaturesConfig setFilterAndProjectMinOutputPageRowCount(int filterAndProjectMinOutputPageRowCount)
     {
         this.filterAndProjectMinOutputPageRowCount = filterAndProjectMinOutputPageRowCount;
+        return this;
+    }
+
+    @Config("histogram.implementation")
+    public FeaturesConfig setHistogramGroupImplementation(HistogramGroupImplementation groupByMode)
+    {
+        this.histogramGroupImplementation = groupByMode;
+        return this;
+    }
+
+    public HistogramGroupImplementation getHistogramGroupImplementation()
+    {
+        return histogramGroupImplementation;
+    }
+
+    public ArrayAggGroupImplementation getArrayAggGroupImplementation()
+    {
+        return arrayAggGroupImplementation;
+    }
+
+    @Config("arrayagg.implementation")
+    public FeaturesConfig setArrayAggGroupImplementation(ArrayAggGroupImplementation groupByMode)
+    {
+        this.arrayAggGroupImplementation = groupByMode;
         return this;
     }
 }

@@ -22,7 +22,6 @@ import com.facebook.presto.orc.stream.InputStreamSources;
 import com.facebook.presto.orc.stream.LongInputStream;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
-import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.type.Type;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -119,7 +118,7 @@ public class TimestampStreamReader
             nanosVector = new long[nextBatchSize];
         }
 
-        BlockBuilder builder = type.createBlockBuilder(new BlockBuilderStatus(), nextBatchSize);
+        BlockBuilder builder = type.createBlockBuilder(null, nextBatchSize);
         if (presentStream == null) {
             if (secondsStream == null) {
                 throw new OrcCorruptionException(streamDescriptor.getOrcDataSourceId(), "Value is not null but seconds stream is not present");
@@ -185,7 +184,6 @@ public class TimestampStreamReader
 
     @Override
     public void startStripe(InputStreamSources dictionaryStreamSources, List<ColumnEncoding> encoding)
-            throws IOException
     {
         presentStreamSource = missingStreamSource(BooleanInputStream.class);
         secondsStreamSource = missingStreamSource(LongInputStream.class);
@@ -203,7 +201,6 @@ public class TimestampStreamReader
 
     @Override
     public void startRowGroup(InputStreamSources dataStreamSources)
-            throws IOException
     {
         presentStreamSource = dataStreamSources.getInputStreamSource(streamDescriptor, PRESENT, BooleanInputStream.class);
         secondsStreamSource = dataStreamSources.getInputStreamSource(streamDescriptor, DATA, LongInputStream.class);
