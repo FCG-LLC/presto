@@ -13,12 +13,14 @@
  */
 package com.facebook.presto.client;
 
+import com.google.common.base.CharMatcher;
 import com.google.common.net.HostAndPort;
 import io.airlift.security.pem.PemReader;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.Credentials;
 import okhttp3.Interceptor;
+import okhttp3.JavaNetCookieJar;
 import okhttp3.OkHttpClient;
 import okhttp3.Response;
 
@@ -34,20 +36,26 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.CookieManager;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.net.HttpHeaders.AUTHORIZATION;
 import static com.google.common.net.HttpHeaders.USER_AGENT;
 import static java.net.Proxy.Type.HTTP;
 import static java.net.Proxy.Type.SOCKS;
+import static java.util.Collections.list;
 import static java.util.Objects.requireNonNull;
 
 public final class OkHttpUtil
@@ -85,12 +93,27 @@ public final class OkHttpUtil
                 .build());
     }
 
+    public static Interceptor tokenAuth(String accessToken)
+    {
+        requireNonNull(accessToken, "accessToken is null");
+        checkArgument(CharMatcher.inRange((char) 33, (char) 126).matchesAllOf(accessToken));
+
+        return chain -> chain.proceed(chain.request().newBuilder()
+                .addHeader(AUTHORIZATION, "Bearer " + accessToken)
+                .build());
+    }
+
     public static void setupTimeouts(OkHttpClient.Builder clientBuilder, int timeout, TimeUnit unit)
     {
         clientBuilder
                 .connectTimeout(timeout, unit)
                 .readTimeout(timeout, unit)
                 .writeTimeout(timeout, unit);
+    }
+
+    public static void setupCookieJar(OkHttpClient.Builder clientBuilder)
+    {
+        clientBuilder.cookieJar(new JavaNetCookieJar(new CookieManager()));
     }
 
     public static void setupSocksProxy(OkHttpClient.Builder clientBuilder, Optional<HostAndPort> socksProxy)
@@ -146,6 +169,7 @@ public final class OkHttpUtil
                         keyStore.load(in, keyManagerPassword);
                     }
                 }
+                validateCertificates(keyStore);
                 KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
                 keyManagerFactory.init(keyStore, keyManagerPassword);
                 keyManagers = keyManagerFactory.getKeyManagers();
@@ -176,6 +200,30 @@ public final class OkHttpUtil
         }
         catch (GeneralSecurityException | IOException e) {
             throw new ClientException("Error setting up SSL: " + e.getMessage(), e);
+        }
+    }
+
+    private static void validateCertificates(KeyStore keyStore)
+            throws GeneralSecurityException
+    {
+        for (String alias : list(keyStore.aliases())) {
+            if (!keyStore.isKeyEntry(alias)) {
+                continue;
+            }
+            Certificate certificate = keyStore.getCertificate(alias);
+            if (!(certificate instanceof X509Certificate)) {
+                continue;
+            }
+
+            try {
+                ((X509Certificate) certificate).checkValidity();
+            }
+            catch (CertificateExpiredException e) {
+                throw new CertificateExpiredException("KeyStore certificate is expired: " + e.getMessage());
+            }
+            catch (CertificateNotYetValidException e) {
+                throw new CertificateNotYetValidException("KeyStore certificate is not yet valid: " + e.getMessage());
+            }
         }
     }
 

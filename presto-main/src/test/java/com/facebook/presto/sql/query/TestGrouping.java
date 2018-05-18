@@ -23,7 +23,6 @@ public class TestGrouping
 
     @BeforeClass
     public void init()
-            throws Exception
     {
         assertions = new QueryAssertions();
     }
@@ -36,25 +35,23 @@ public class TestGrouping
 
     @Test
     public void testImplicitCoercions()
-            throws Exception
     {
         // GROUPING + implicit coercions (issue #8738)
         assertions.assertQuery(
-                "SELECT GROUPING(k), SUM(v) + 1.0 FROM (VALUES (1, 1)) AS t(k,v) GROUP BY k",
-                "VALUES (0, 2.0)");
+                "SELECT GROUPING(k), SUM(v) + 1e0 FROM (VALUES (1, 1)) AS t(k,v) GROUP BY k",
+                "VALUES (0, 2e0)");
 
         assertions.assertQuery(
                 "SELECT\n" +
-                        "    1.0 * count(*), " +
+                        "    1e0 * count(*), " +
                         "    grouping(x) " +
                         "FROM (VALUES 1) t(x) " +
                         "GROUP BY GROUPING SETS ((x), ()) ",
-                "VALUES (1.0, 1), (1.0, 0)");
+                "VALUES (1e0, 1), (1e0, 0)");
     }
 
     @Test
     public void testFilter()
-            throws Exception
     {
         assertions.assertQuery(
                 "SELECT a, b, grouping(a, b) " +

@@ -111,7 +111,6 @@ public abstract class TestDateTimeFunctionsBase
 
     @Test
     public void testCurrentDate()
-            throws Exception
     {
         // current date is the time at midnight in the session time zone
         assertFunction("CURRENT_DATE", DateType.DATE, new SqlDate(toIntExact(epochDaysInZone(TIME_ZONE_KEY, session.getStartTime()))));
@@ -119,11 +118,12 @@ public abstract class TestDateTimeFunctionsBase
 
     @Test
     public void testCurrentDateTimezone()
-            throws Exception
     {
         TimeZoneKey kievTimeZoneKey = getTimeZoneKey("Europe/Kiev");
+        TimeZoneKey bahiaBanderasTimeZoneKey = getTimeZoneKey("America/Bahia_Banderas"); // The zone has 'gap' on 1970-01-01
         for (long instant = new DateTime(2000, 6, 15, 0, 0).getMillis(); instant < new DateTime(2016, 6, 15, 0, 0).getMillis(); instant += TimeUnit.HOURS.toMillis(1)) {
             assertCurrentDateAtInstant(kievTimeZoneKey, instant);
+            assertCurrentDateAtInstant(bahiaBanderasTimeZoneKey, instant);
             assertCurrentDateAtInstant(TIME_ZONE_KEY, instant);
         }
     }
@@ -142,7 +142,6 @@ public abstract class TestDateTimeFunctionsBase
 
     @Test
     public void testLocalTime()
-            throws Exception
     {
         long millis = new LocalTime(session.getStartTime(), DATE_TIME_ZONE).getMillisOfDay();
         functionAssertions.assertFunction("LOCALTIME", TimeType.TIME, toTime(millis));
@@ -150,7 +149,6 @@ public abstract class TestDateTimeFunctionsBase
 
     @Test
     public void testCurrentTime()
-            throws Exception
     {
         long millis = new LocalTime(session.getStartTime(), DATE_TIME_ZONE).getMillisOfDay();
         functionAssertions.assertFunction("CURRENT_TIME", TIME_WITH_TIME_ZONE, new SqlTimeWithTimeZone(millis, session.getTimeZoneKey()));
@@ -959,7 +957,6 @@ public abstract class TestDateTimeFunctionsBase
 
     @Test
     public void testIntervalDayToSecondToMilliseconds()
-            throws Exception
     {
         assertFunction("to_milliseconds(parse_duration('1ns'))", BigintType.BIGINT, 0L);
         assertFunction("to_milliseconds(parse_duration('1ms'))", BigintType.BIGINT, 1L);

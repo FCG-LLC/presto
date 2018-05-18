@@ -21,7 +21,6 @@ import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnIdentity;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorInsertTableHandle;
-import com.facebook.presto.spi.ConnectorNewTableLayout;
 import com.facebook.presto.spi.ConnectorOutputTableHandle;
 import com.facebook.presto.spi.ConnectorResolvedIndex;
 import com.facebook.presto.spi.ConnectorSession;
@@ -35,6 +34,7 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.SchemaTablePrefix;
+import com.facebook.presto.spi.SystemTable;
 import com.facebook.presto.spi.TableIdentity;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
@@ -73,6 +73,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
@@ -161,14 +162,24 @@ public class MetadataManager
 
     public static MetadataManager createTestMetadataManager()
     {
-        return createTestMetadataManager(new CatalogManager());
+        return createTestMetadataManager(new FeaturesConfig());
+    }
+
+    public static MetadataManager createTestMetadataManager(FeaturesConfig featuresConfig)
+    {
+        return createTestMetadataManager(new CatalogManager(), featuresConfig);
     }
 
     public static MetadataManager createTestMetadataManager(CatalogManager catalogManager)
     {
+        return createTestMetadataManager(catalogManager, new FeaturesConfig());
+    }
+
+    public static MetadataManager createTestMetadataManager(CatalogManager catalogManager, FeaturesConfig featuresConfig)
+    {
         TypeManager typeManager = new TypeRegistry();
         return new MetadataManager(
-                new FeaturesConfig(),
+                featuresConfig,
                 typeManager,
                 new BlockEncodingManager(typeManager),
                 new SessionPropertyManager(),
@@ -272,7 +283,9 @@ public class MetadataManager
             ConnectorSession connectorSession = session.toConnectorSession(catalogMetadata.getConnectorId());
             for (ConnectorId connectorId : catalogMetadata.listConnectorIds()) {
                 ConnectorMetadata metadata = catalogMetadata.getMetadataFor(connectorId);
-                schemaNames.addAll(metadata.listSchemaNames(connectorSession));
+                metadata.listSchemaNames(connectorSession).stream()
+                        .map(schema -> schema.toLowerCase(Locale.ENGLISH))
+                        .forEach(schemaNames::add);
             }
         }
         return ImmutableList.copyOf(schemaNames.build());
@@ -286,13 +299,32 @@ public class MetadataManager
         Optional<CatalogMetadata> catalog = getOptionalCatalogMetadata(session, table.getCatalogName());
         if (catalog.isPresent()) {
             CatalogMetadata catalogMetadata = catalog.get();
-            ConnectorId connectorId = catalogMetadata.getConnectorId(table);
+            ConnectorId connectorId = catalogMetadata.getConnectorId(session, table);
             ConnectorMetadata metadata = catalogMetadata.getMetadataFor(connectorId);
 
             ConnectorTableHandle tableHandle = metadata.getTableHandle(session.toConnectorSession(connectorId), table.asSchemaTableName());
             if (tableHandle != null) {
                 return Optional.of(new TableHandle(connectorId, tableHandle));
             }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<SystemTable> getSystemTable(Session session, QualifiedObjectName tableName)
+    {
+        requireNonNull(session, "session is null");
+        requireNonNull(tableName, "table is null");
+
+        Optional<CatalogMetadata> catalog = getOptionalCatalogMetadata(session, tableName.getCatalogName());
+        if (catalog.isPresent()) {
+            CatalogMetadata catalogMetadata = catalog.get();
+
+            // we query only main connector for runtime system tables
+            ConnectorId connectorId = catalogMetadata.getConnectorId();
+            ConnectorMetadata metadata = catalogMetadata.getMetadataFor(connectorId);
+
+            return metadata.getSystemTable(session.toConnectorSession(connectorId), tableName.asSchemaTableName());
         }
         return Optional.empty();
     }
@@ -398,7 +430,8 @@ public class MetadataManager
                 ConnectorMetadata metadata = catalogMetadata.getMetadataFor(connectorId);
                 ConnectorSession connectorSession = session.toConnectorSession(connectorId);
                 metadata.listTables(connectorSession, schemaNameOrNull).stream()
-                        .map(convertFromSchemaTableName(prefix.getCatalogName())::apply)
+                        .map(convertFromSchemaTableName(prefix.getCatalogName()))
+                        .filter(prefix::matches)
                         .forEach(tables::add);
             }
         }
@@ -564,12 +597,8 @@ public class MetadataManager
         CatalogMetadata catalogMetadata = getCatalogMetadataForWrite(session, connectorId);
         ConnectorMetadata metadata = catalogMetadata.getMetadata();
 
-        Optional<ConnectorNewTableLayout> insertLayout = metadata.getInsertLayout(session.toConnectorSession(connectorId), table.getConnectorHandle());
-        if (!insertLayout.isPresent()) {
-            return Optional.empty();
-        }
-
-        return Optional.of(new NewTableLayout(connectorId, catalogMetadata.getTransactionHandleFor(connectorId), insertLayout.get()));
+        return metadata.getInsertLayout(session.toConnectorSession(connectorId), table.getConnectorHandle())
+                .map(layout -> new NewTableLayout(connectorId, catalogMetadata.getTransactionHandleFor(connectorId), layout));
     }
 
     @Override
@@ -732,7 +761,8 @@ public class MetadataManager
                 ConnectorMetadata metadata = catalogMetadata.getMetadataFor(connectorId);
                 ConnectorSession connectorSession = session.toConnectorSession(connectorId);
                 metadata.listViews(connectorSession, schemaNameOrNull).stream()
-                        .map(convertFromSchemaTableName(prefix.getCatalogName())::apply)
+                        .map(convertFromSchemaTableName(prefix.getCatalogName()))
+                        .filter(prefix::matches)
                         .forEach(views::add);
             }
         }
@@ -772,7 +802,7 @@ public class MetadataManager
         Optional<CatalogMetadata> catalog = getOptionalCatalogMetadata(session, viewName.getCatalogName());
         if (catalog.isPresent()) {
             CatalogMetadata catalogMetadata = catalog.get();
-            ConnectorId connectorId = catalogMetadata.getConnectorId(viewName);
+            ConnectorId connectorId = catalogMetadata.getConnectorId(session, viewName);
             ConnectorMetadata metadata = catalogMetadata.getMetadataFor(connectorId);
 
             Map<SchemaTableName, ConnectorViewDefinition> views = metadata.getViews(
@@ -780,7 +810,11 @@ public class MetadataManager
                     viewName.asSchemaTableName().toSchemaTablePrefix());
             ConnectorViewDefinition view = views.get(viewName.asSchemaTableName());
             if (view != null) {
-                return Optional.of(deserializeView(view.getViewData()));
+                ViewDefinition definition = deserializeView(view.getViewData());
+                if (view.getOwner().isPresent()) {
+                    definition = definition.withOwner(view.getOwner().get());
+                }
+                return Optional.of(definition);
             }
         }
         return Optional.empty();

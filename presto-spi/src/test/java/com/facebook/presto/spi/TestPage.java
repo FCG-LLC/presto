@@ -15,7 +15,6 @@ package com.facebook.presto.spi;
 
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
-import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.block.DictionaryBlock;
 import com.facebook.presto.spi.block.DictionaryId;
 import io.airlift.slice.DynamicSliceOutput;
@@ -35,14 +34,12 @@ public class TestPage
 {
     @Test
     public void testGetRegion()
-            throws Exception
     {
         assertEquals(new Page(10).getRegion(5, 5).getPositionCount(), 5);
     }
 
     @Test
     public void testGetEmptyRegion()
-            throws Exception
     {
         assertEquals(new Page(0).getRegion(0, 0).getPositionCount(), 0);
         assertEquals(new Page(10).getRegion(5, 0).getPositionCount(), 0);
@@ -50,21 +47,18 @@ public class TestPage
 
     @Test(expectedExceptions = IndexOutOfBoundsException.class, expectedExceptionsMessageRegExp = "Invalid position 1 and length 1 in page with 0 positions")
     public void testGetRegionExceptions()
-            throws Exception
     {
         new Page(0).getRegion(1, 1);
     }
 
     @Test
     public void testGetRegionFromNoColumnPage()
-            throws Exception
     {
         assertEquals(new Page(100).getRegion(0, 10).getPositionCount(), 10);
     }
 
     @Test
     public void testCompactDictionaryBlocks()
-            throws Exception
     {
         int positionCount = 100;
 
@@ -79,7 +73,7 @@ public class TestPage
         DictionaryBlock commonSourceIdBlock1 = new DictionaryBlock(positionCount, dictionary1, commonDictionaryIds, commonSourceId);
 
         // second dictionary block is "length(firstColumn)"
-        BlockBuilder dictionary2 = BIGINT.createBlockBuilder(new BlockBuilderStatus(), dictionary1.getPositionCount());
+        BlockBuilder dictionary2 = BIGINT.createBlockBuilder(null, dictionary1.getPositionCount());
         for (Slice expectedValue : dictionaryValues1) {
             BIGINT.writeLong(dictionary2, expectedValue.length());
         }
@@ -109,10 +103,9 @@ public class TestPage
 
     @Test
     public void testGetPositions()
-            throws Exception
     {
         int entries = 10;
-        BlockBuilder blockBuilder = BIGINT.createBlockBuilder(new BlockBuilderStatus(), entries);
+        BlockBuilder blockBuilder = BIGINT.createBlockBuilder(null, entries);
         for (int i = 0; i < entries; i++) {
             BIGINT.writeLong(blockBuilder, i);
         }
@@ -159,7 +152,7 @@ public class TestPage
 
     private static Block createSlicesBlock(Slice[] values)
     {
-        BlockBuilder builder = VARBINARY.createBlockBuilder(new BlockBuilderStatus(), 100);
+        BlockBuilder builder = VARBINARY.createBlockBuilder(null, 100);
 
         for (Slice value : values) {
             verify(value != null);

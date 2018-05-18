@@ -67,6 +67,12 @@ Mathematical Functions
     a real value and the standard deviation must be a real and positive value.
     The probability p must lie on the interval (0, 1).
 
+.. function:: normal_cdf(mean, sd, v) -> double
+
+    Compute the Normal cdf with given mean and standard deviation (sd):  P(N < v; mean, sd).
+    The mean and value v must be real values and the standard deviation must be a real
+    and positive value.
+
 .. function:: ln(x) -> double
 
     Returns the natural logarithm of ``x``.
@@ -78,10 +84,6 @@ Mathematical Functions
 .. function:: log10(x) -> double
 
     Returns the base 10 logarithm of ``x``.
-
-.. function:: log(x, b) -> double
-
-    Returns the base ``b`` logarithm of ``x``.
 
 .. function:: mod(n, m) -> [same as input]
 

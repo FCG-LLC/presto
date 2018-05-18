@@ -20,11 +20,15 @@ import com.facebook.presto.execution.TaskState;
 import com.facebook.presto.execution.TaskStateMachine;
 import com.facebook.presto.memory.QueryContext;
 import com.facebook.presto.memory.QueryContextVisitor;
+import com.facebook.presto.memory.context.LocalMemoryContext;
+import com.facebook.presto.memory.context.MemoryTrackingContext;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.AtomicDouble;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.stats.CounterStat;
+import io.airlift.stats.GcMonitor;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import org.joda.time.DateTime;
@@ -47,7 +51,9 @@ import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.airlift.units.DataSize.succinctBytes;
 import static java.lang.Math.max;
+import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.stream.Collectors.toList;
 
@@ -56,18 +62,19 @@ public class TaskContext
 {
     private final QueryContext queryContext;
     private final TaskStateMachine taskStateMachine;
+    private final GcMonitor gcMonitor;
     private final Executor notificationExecutor;
     private final ScheduledExecutorService yieldExecutor;
     private final Session session;
 
-    private final AtomicLong memoryReservation = new AtomicLong();
-    private final AtomicLong systemMemoryReservation = new AtomicLong();
-    private final AtomicLong revocableMemoryReservation = new AtomicLong();
-
     private final long createNanos = System.nanoTime();
 
     private final AtomicLong startNanos = new AtomicLong();
+    private final AtomicLong startFullGcCount = new AtomicLong(-1);
+    private final AtomicLong startFullGcTimeNanos = new AtomicLong(-1);
     private final AtomicLong endNanos = new AtomicLong();
+    private final AtomicLong endFullGcCount = new AtomicLong(-1);
+    private final AtomicLong endFullGcTimeNanos = new AtomicLong(-1);
 
     private final AtomicReference<DateTime> executionStartTime = new AtomicReference<>();
     private final AtomicReference<DateTime> lastExecutionStartTime = new AtomicReference<>();
@@ -81,42 +88,49 @@ public class TaskContext
     private final boolean cpuTimerEnabled;
 
     private final Object cumulativeMemoryLock = new Object();
-    private final AtomicDouble cumulativeMemory = new AtomicDouble(0.0);
+    private final AtomicDouble cumulativeUserMemory = new AtomicDouble(0.0);
 
     @GuardedBy("cumulativeMemoryLock")
-    private long lastMemoryReservation;
+    private long lastUserMemoryReservation;
 
     @GuardedBy("cumulativeMemoryLock")
     private long lastTaskStatCallNanos;
 
+    private final MemoryTrackingContext taskMemoryContext;
+
     public static TaskContext createTaskContext(
             QueryContext queryContext,
             TaskStateMachine taskStateMachine,
+            GcMonitor gcMonitor,
             Executor notificationExecutor,
             ScheduledExecutorService yieldExecutor,
             Session session,
+            MemoryTrackingContext taskMemoryContext,
             boolean verboseStats,
             boolean cpuTimerEnabled)
     {
-        TaskContext taskContext = new TaskContext(queryContext, taskStateMachine, notificationExecutor, yieldExecutor, session, verboseStats, cpuTimerEnabled);
+        TaskContext taskContext = new TaskContext(queryContext, taskStateMachine, gcMonitor, notificationExecutor, yieldExecutor, session, taskMemoryContext, verboseStats, cpuTimerEnabled);
         taskContext.initialize();
         return taskContext;
     }
 
-    private TaskContext(
-            QueryContext queryContext,
+    private TaskContext(QueryContext queryContext,
             TaskStateMachine taskStateMachine,
+            GcMonitor gcMonitor,
             Executor notificationExecutor,
             ScheduledExecutorService yieldExecutor,
             Session session,
+            MemoryTrackingContext taskMemoryContext,
             boolean verboseStats,
             boolean cpuTimerEnabled)
     {
         this.taskStateMachine = requireNonNull(taskStateMachine, "taskStateMachine is null");
+        this.gcMonitor = requireNonNull(gcMonitor, "gcMonitor is null");
         this.queryContext = requireNonNull(queryContext, "queryContext is null");
         this.notificationExecutor = requireNonNull(notificationExecutor, "notificationExecutor is null");
         this.yieldExecutor = requireNonNull(yieldExecutor, "yieldExecutor is null");
         this.session = session;
+        this.taskMemoryContext = requireNonNull(taskMemoryContext, "taskMemoryContext is null");
         this.verboseStats = verboseStats;
         this.cpuTimerEnabled = cpuTimerEnabled;
     }
@@ -126,12 +140,7 @@ public class TaskContext
     // another thread, which will cause unsafe publication of this instance.
     private void initialize()
     {
-        taskStateMachine.addStateChangeListener(newState -> {
-            if (newState.isDone()) {
-                executionEndTime.set(DateTime.now());
-                endNanos.set(System.nanoTime());
-            }
-        });
+        taskStateMachine.addStateChangeListener(this::updateStatsIfDone);
     }
 
     public TaskId getTaskId()
@@ -141,7 +150,14 @@ public class TaskContext
 
     public PipelineContext addPipelineContext(int pipelineId, boolean inputPipeline, boolean outputPipeline)
     {
-        PipelineContext pipelineContext = new PipelineContext(pipelineId, this, notificationExecutor, yieldExecutor, inputPipeline, outputPipeline);
+        PipelineContext pipelineContext = new PipelineContext(
+                pipelineId,
+                this,
+                notificationExecutor,
+                yieldExecutor,
+                taskMemoryContext.newMemoryTrackingContext(),
+                inputPipeline,
+                outputPipeline);
         pipelineContexts.add(pipelineContext);
         return pipelineContext;
     }
@@ -156,9 +172,36 @@ public class TaskContext
         DateTime now = DateTime.now();
         executionStartTime.compareAndSet(null, now);
         startNanos.compareAndSet(0, System.nanoTime());
+        startFullGcCount.compareAndSet(-1, gcMonitor.getMajorGcCount());
+        startFullGcTimeNanos.compareAndSet(-1, gcMonitor.getMajorGcTime().roundTo(NANOSECONDS));
 
         // always update last execution start time
         lastExecutionStartTime.set(now);
+    }
+
+    private void updateStatsIfDone(TaskState newState)
+    {
+        if (newState.isDone()) {
+            DateTime now = DateTime.now();
+            long majorGcCount = gcMonitor.getMajorGcCount();
+            long majorGcTime = gcMonitor.getMajorGcTime().roundTo(NANOSECONDS);
+
+            // before setting the end times, make sure a start has been recorded
+            executionStartTime.compareAndSet(null, now);
+            startNanos.compareAndSet(0, System.nanoTime());
+            startFullGcCount.compareAndSet(-1, majorGcCount);
+            startFullGcTimeNanos.compareAndSet(-1, majorGcTime);
+
+            // Only update last start time, if the nothing was started
+            lastExecutionStartTime.compareAndSet(null, now);
+
+            // use compare and set from initial value to avoid overwriting if there
+            // were a duplicate notification, which shouldn't happen
+            executionEndTime.compareAndSet(null, now);
+            endNanos.compareAndSet(0, System.nanoTime());
+            endFullGcCount.compareAndSet(-1, majorGcCount);
+            endFullGcTimeNanos.compareAndSet(-1, majorGcTime);
+        }
     }
 
     public void failed(Throwable cause)
@@ -178,7 +221,12 @@ public class TaskContext
 
     public DataSize getMemoryReservation()
     {
-        return new DataSize(memoryReservation.get(), BYTE);
+        return new DataSize(taskMemoryContext.getUserMemory(), BYTE);
+    }
+
+    public DataSize getSystemMemoryReservation()
+    {
+        return new DataSize(taskMemoryContext.getSystemMemory(), BYTE);
     }
 
     /**
@@ -202,77 +250,33 @@ public class TaskContext
         return pipelineContexts;
     }
 
-    public synchronized ListenableFuture<?> reserveMemory(long bytes)
-    {
-        checkArgument(bytes >= 0, "bytes is negative");
-
-        ListenableFuture<?> future = queryContext.reserveMemory(bytes);
-        memoryReservation.getAndAdd(bytes);
-        return future;
-    }
-
-    public synchronized ListenableFuture<?> reserveRevocableMemory(long bytes)
-    {
-        checkArgument(bytes >= 0, "bytes is negative");
-
-        ListenableFuture<?> future = queryContext.reserveRevocableMemory(bytes);
-        revocableMemoryReservation.getAndAdd(bytes);
-        return future;
-    }
-
-    public synchronized ListenableFuture<?> reserveSystemMemory(long bytes)
-    {
-        checkArgument(bytes >= 0, "bytes is negative");
-        ListenableFuture<?> future = queryContext.reserveSystemMemory(bytes);
-        systemMemoryReservation.getAndAdd(bytes);
-        return future;
-    }
-
     public synchronized ListenableFuture<?> reserveSpill(long bytes)
     {
         checkArgument(bytes >= 0, "bytes is negative");
         return queryContext.reserveSpill(bytes);
     }
 
-    public synchronized boolean tryReserveMemory(long bytes)
-    {
-        checkArgument(bytes >= 0, "bytes is negative");
-
-        if (queryContext.tryReserveMemory(bytes)) {
-            memoryReservation.getAndAdd(bytes);
-            return true;
-        }
-        return false;
-    }
-
-    public synchronized void freeMemory(long bytes)
-    {
-        checkArgument(bytes >= 0, "bytes is negative");
-        checkArgument(bytes <= memoryReservation.get(), "tried to free more memory than is reserved");
-        memoryReservation.getAndAdd(-bytes);
-        queryContext.freeMemory(bytes);
-    }
-
-    public synchronized void freeRevocableMemory(long bytes)
-    {
-        checkArgument(bytes >= 0, "bytes is negative");
-        checkArgument(bytes <= revocableMemoryReservation.get(), "tried to free more revocable memory than is reserved");
-        revocableMemoryReservation.getAndAdd(-bytes);
-        queryContext.freeRevocableMemory(bytes);
-    }
-
-    public synchronized void freeSystemMemory(long bytes)
-    {
-        checkArgument(bytes >= 0, "bytes is negative");
-        checkArgument(bytes <= systemMemoryReservation.get(), "tried to free more system memory than is reserved");
-        systemMemoryReservation.getAndAdd(-bytes);
-        queryContext.freeSystemMemory(bytes);
-    }
-
     public synchronized void freeSpill(long bytes)
     {
         checkArgument(bytes >= 0, "bytes is negative");
         queryContext.freeSpill(bytes);
+    }
+
+    public LocalMemoryContext localSystemMemoryContext()
+    {
+        return taskMemoryContext.localSystemMemoryContext();
+    }
+
+    /**
+     * This method is used to create a new LocalMemoryContext that will be used to keep track of the bytes transferred from
+     * the OperatorContext with the OperatorContext::transferMemoryToTaskContext() method.
+     * Creating a new memory context for this purpose simplifies tracking those bytes.
+     * The caller must close this LocalMemoryContext when done.
+     * @return a new LocalMemoryContext to track the bytes transferred from the OperatorContext to TaskContext
+     */
+    public synchronized LocalMemoryContext createNewTransferredBytesMemoryContext()
+    {
+        return taskMemoryContext.newUserMemoryContext();
     }
 
     public void moreMemoryAvailable()
@@ -334,16 +338,38 @@ public class TaskContext
         return stat;
     }
 
+    public Duration getFullGcTime()
+    {
+        long startFullGcTimeNanos = this.startFullGcTimeNanos.get();
+        if (startFullGcTimeNanos < 0) {
+            return new Duration(0, MILLISECONDS);
+        }
+
+        long endFullGcTimeNanos = this.endFullGcTimeNanos.get();
+        if (endFullGcTimeNanos < 0) {
+            endFullGcTimeNanos = gcMonitor.getMajorGcTime().roundTo(NANOSECONDS);
+        }
+        return new Duration(max(0, endFullGcTimeNanos - startFullGcTimeNanos), NANOSECONDS);
+    }
+
+    public int getFullGcCount()
+    {
+        long startFullGcCount = this.startFullGcCount.get();
+        if (startFullGcCount < 0) {
+            return 0;
+        }
+
+        long endFullGcCount = this.endFullGcCount.get();
+        if (endFullGcCount <= 0) {
+            endFullGcCount = gcMonitor.getMajorGcCount();
+        }
+        return toIntExact(max(0, endFullGcCount - startFullGcCount));
+    }
+
     public TaskStats getTaskStats()
     {
         // check for end state to avoid callback ordering problems
-        if (taskStateMachine.getState().isDone()) {
-            DateTime now = DateTime.now();
-            if (executionEndTime.compareAndSet(null, now)) {
-                lastExecutionStartTime.compareAndSet(null, now);
-                endNanos.set(System.nanoTime());
-            }
-        }
+        updateStatsIfDone(taskStateMachine.getState());
 
         List<PipelineStats> pipelineStats = ImmutableList.copyOf(transform(pipelineContexts, PipelineContext::getPipelineStats));
 
@@ -422,14 +448,18 @@ public class TaskContext
             elapsedTime = new Duration(0, NANOSECONDS);
         }
 
+        int fullGcCount = getFullGcCount();
+        Duration fullGcTime = getFullGcTime();
+
+        long userMemory = taskMemoryContext.getUserMemory();
+
         synchronized (cumulativeMemoryLock) {
             double sinceLastPeriodMillis = (System.nanoTime() - lastTaskStatCallNanos) / 1_000_000.0;
-            long currentMemory = memoryReservation.get();
-            long averageMemoryForLastPeriod = (currentMemory + lastMemoryReservation) / 2;
-            cumulativeMemory.addAndGet(averageMemoryForLastPeriod * sinceLastPeriodMillis);
+            long averageMemoryForLastPeriod = (userMemory + lastUserMemoryReservation) / 2;
+            cumulativeUserMemory.addAndGet(averageMemoryForLastPeriod * sinceLastPeriodMillis);
 
             lastTaskStatCallNanos = System.nanoTime();
-            lastMemoryReservation = currentMemory;
+            lastUserMemoryReservation = userMemory;
         }
 
         Set<PipelineStats> runningPipelineStats = pipelineStats.stream()
@@ -456,10 +486,10 @@ public class TaskContext
                 runningPartitionedDrivers,
                 blockedDrivers,
                 completedDrivers,
-                cumulativeMemory.get(),
-                succinctBytes(memoryReservation.get()),
-                succinctBytes(revocableMemoryReservation.get()),
-                succinctBytes(systemMemoryReservation.get()),
+                cumulativeUserMemory.get(),
+                succinctBytes(userMemory),
+                succinctBytes(taskMemoryContext.getRevocableMemory()),
+                succinctBytes(taskMemoryContext.getSystemMemory()),
                 new Duration(totalScheduledTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
                 new Duration(totalCpuTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
                 new Duration(totalUserTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
@@ -473,6 +503,8 @@ public class TaskContext
                 succinctBytes(outputDataSize),
                 outputPositions,
                 succinctBytes(physicalWrittenDataSize),
+                fullGcCount,
+                fullGcTime,
                 pipelineStats);
     }
 
@@ -486,5 +518,17 @@ public class TaskContext
         return pipelineContexts.stream()
                 .map(pipelineContext -> pipelineContext.accept(visitor, context))
                 .collect(toList());
+    }
+
+    @VisibleForTesting
+    public synchronized MemoryTrackingContext getTaskMemoryContext()
+    {
+        return taskMemoryContext;
+    }
+
+    @VisibleForTesting
+    public QueryContext getQueryContext()
+    {
+        return queryContext;
     }
 }

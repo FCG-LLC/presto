@@ -119,7 +119,7 @@ and deficiencies of `extends:` syntax (see the note
 To ease the pain of passing multiple `-f` arguments to `docker-compose`,
 each environment has a `compose.sh` wrapper script. Thanks to it, instead of e.g.
 
-`docker-compose -f ./docker-compose.yml -f ../common/standard.yml -f ../common/jdbc_db.yml [compose commands]`
+`docker-compose -f ./docker-compose.yml -f ../common/standard.yml [compose commands]`
 
 one can simply write
 
@@ -438,7 +438,7 @@ section.
     note that execution of the product test will be suspended until a
     debugger is attached.
 
-3. Set a breakpoint at the beginning of the `com.teradata.tempto.internal.convention.ConventionBasedTestFactory#createTestCases`
+3. Set a breakpoint at the beginning of the `io.prestodb.tempto.internal.convention.ConventionBasedTestFactory#createTestCases`
 method. This is the main entry point for the convention based tests. When
 opening the `ConventionBasedTestFactory` class for the first time, IntelliJ
 will display a de-compiled version because `ConventionBasedTestFactory` is

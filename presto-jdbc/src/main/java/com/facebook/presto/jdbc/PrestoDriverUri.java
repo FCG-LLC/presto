@@ -32,10 +32,13 @@ import java.util.Properties;
 
 import static com.facebook.presto.client.KerberosUtil.defaultCredentialCachePath;
 import static com.facebook.presto.client.OkHttpUtil.basicAuth;
+import static com.facebook.presto.client.OkHttpUtil.setupCookieJar;
 import static com.facebook.presto.client.OkHttpUtil.setupHttpProxy;
 import static com.facebook.presto.client.OkHttpUtil.setupKerberos;
 import static com.facebook.presto.client.OkHttpUtil.setupSocksProxy;
 import static com.facebook.presto.client.OkHttpUtil.setupSsl;
+import static com.facebook.presto.client.OkHttpUtil.tokenAuth;
+import static com.facebook.presto.jdbc.ConnectionProperties.ACCESS_TOKEN;
 import static com.facebook.presto.jdbc.ConnectionProperties.HTTP_PROXY;
 import static com.facebook.presto.jdbc.ConnectionProperties.KERBEROS_CONFIG_PATH;
 import static com.facebook.presto.jdbc.ConnectionProperties.KERBEROS_CREDENTIAL_CACHE_PATH;
@@ -90,7 +93,8 @@ final class PrestoDriverUri
 
         validateConnectionProperties(properties);
 
-        useSecureConnection = SSL.getRequiredValue(properties);
+        // enable SSL by default for standard port
+        useSecureConnection = SSL.getValue(properties).orElse(uri.getPort() == 443);
 
         initCatalogAndSchema();
     }
@@ -130,6 +134,7 @@ final class PrestoDriverUri
             throws SQLException
     {
         try {
+            setupCookieJar(builder);
             setupSocksProxy(builder, SOCKS_PROXY.getValue(properties));
             setupHttpProxy(builder, HTTP_PROXY.getValue(properties));
 
@@ -164,6 +169,13 @@ final class PrestoDriverUri
                         KERBEROS_KEYTAB_PATH.getValue(properties),
                         Optional.ofNullable(KERBEROS_CREDENTIAL_CACHE_PATH.getValue(properties)
                                 .orElseGet(() -> defaultCredentialCachePath().map(File::new).orElse(null))));
+            }
+
+            if (ACCESS_TOKEN.getValue(properties).isPresent()) {
+                if (!useSecureConnection) {
+                    throw new SQLException("Authentication using an access token requires SSL to be enabled");
+                }
+                builder.addInterceptor(tokenAuth(ACCESS_TOKEN.getValue(properties).get()));
             }
         }
         catch (ClientException e) {

@@ -22,6 +22,7 @@ import com.facebook.presto.metadata.TableLayoutResult;
 import com.facebook.presto.metadata.TableMetadata;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.Constraint;
+import com.facebook.presto.spi.security.Identity;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.facebook.presto.testing.MaterializedResult;
@@ -44,9 +45,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.LongStream;
 
 import static com.facebook.presto.SystemSessionProperties.COLOCATED_JOIN;
 import static com.facebook.presto.SystemSessionProperties.CONCURRENT_LIFESPANS_PER_NODE;
+import static com.facebook.presto.SystemSessionProperties.DISTRIBUTED_JOIN;
+import static com.facebook.presto.SystemSessionProperties.GROUPED_EXECUTION_FOR_AGGREGATION;
 import static com.facebook.presto.hive.HiveColumnHandle.BUCKET_COLUMN_NAME;
 import static com.facebook.presto.hive.HiveColumnHandle.PATH_COLUMN_NAME;
 import static com.facebook.presto.hive.HiveQueryRunner.HIVE_CATALOG;
@@ -70,9 +74,11 @@ import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharType;
 import static com.facebook.presto.spi.type.VarcharType.createVarcharType;
 import static com.facebook.presto.testing.MaterializedResult.resultBuilder;
+import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 import static com.facebook.presto.testing.assertions.Assert.assertEquals;
 import static com.facebook.presto.tests.QueryAssertions.assertEqualsIgnoreOrder;
 import static com.facebook.presto.transaction.TransactionBuilder.transaction;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.io.Files.createTempDir;
 import static com.google.common.io.MoreFiles.deleteRecursively;
@@ -82,6 +88,7 @@ import static io.airlift.tpch.TpchTable.ORDERS;
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
@@ -130,42 +137,7 @@ public class TestHiveIntegrationSmokeTest
     }
 
     @Test
-    public void testInformationSchemaTablesWithoutEqualityConstraint()
-            throws Exception
-    {
-        @Language("SQL") String actual = "" +
-                "SELECT lower(table_name) " +
-                "FROM information_schema.tables " +
-                "WHERE table_catalog = '" + catalog + "' AND table_schema LIKE 'tpch' AND table_name LIKE '%orders'";
-
-        @Language("SQL") String expected = "" +
-                "SELECT lower(table_name) " +
-                "FROM information_schema.tables " +
-                "WHERE table_name LIKE '%ORDERS'";
-
-        assertQuery(actual, expected);
-    }
-
-    @Test
-    public void testInformationSchemaColumnsWithoutEqualityConstraint()
-            throws Exception
-    {
-        @Language("SQL") String actual = "" +
-                "SELECT lower(table_name), lower(column_name) " +
-                "FROM information_schema.columns " +
-                "WHERE table_catalog = '" + catalog + "' AND table_schema = 'tpch' AND table_name LIKE '%orders%'";
-
-        @Language("SQL") String expected = "" +
-                "SELECT lower(table_name), lower(column_name) " +
-                "FROM information_schema.columns " +
-                "WHERE table_name LIKE '%ORDERS%'";
-
-        assertQuery(actual, expected);
-    }
-
-    @Test
     public void createTableWithEveryType()
-            throws Exception
     {
         @Language("SQL") String query = "" +
                 "CREATE TABLE test_types_table AS " +
@@ -205,7 +177,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void createPartitionedTable()
-            throws Exception
     {
         for (TestingHiveStorageFormat storageFormat : getAllTestingHiveStorageFormat()) {
             if (insertOperationsSupported(storageFormat.getFormat())) {
@@ -343,7 +314,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void createTableLike()
-            throws Exception
     {
         createTableLike("", false);
         createTableLike("EXCLUDING PROPERTIES", false);
@@ -455,7 +425,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void createTableAs()
-            throws Exception
     {
         for (TestingHiveStorageFormat storageFormat : getAllTestingHiveStorageFormat()) {
             if (insertOperationsSupported(storageFormat.getFormat())) {
@@ -506,7 +475,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void createPartitionedTableAs()
-            throws Exception
     {
         for (TestingHiveStorageFormat storageFormat : getAllTestingHiveStorageFormat()) {
             createPartitionedTableAs(storageFormat.getSession(), storageFormat.getFormat());
@@ -552,7 +520,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "Partition keys must be the last columns in the table and in the same order as the table properties.*")
     public void testCreatePartitionedTableAsInvalidColumnOrdering()
-            throws Exception
     {
         assertUpdate("" +
                 "CREATE TABLE test_create_table_as_invalid_column_ordering " +
@@ -588,7 +555,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testCreatePartitionedBucketedTableAsFewRows()
-            throws Exception
     {
         // go through all storage formats to make sure the empty buckets are correctly created
         for (TestingHiveStorageFormat storageFormat : getAllTestingHiveStorageFormat()) {
@@ -639,13 +605,11 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testCreatePartitionedBucketedTableAs()
-            throws Exception
     {
         testCreatePartitionedBucketedTableAs(HiveStorageFormat.RCBINARY);
     }
 
     private void testCreatePartitionedBucketedTableAs(HiveStorageFormat storageFormat)
-            throws Exception
     {
         String tableName = "test_create_partitioned_bucketed_table_as";
 
@@ -675,13 +639,11 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testCreatePartitionedBucketedTableAsWithUnionAll()
-            throws Exception
     {
         testCreatePartitionedBucketedTableAsWithUnionAll(HiveStorageFormat.RCBINARY);
     }
 
     private void testCreatePartitionedBucketedTableAsWithUnionAll(HiveStorageFormat storageFormat)
-            throws Exception
     {
         String tableName = "test_create_partitioned_bucketed_table_as_with_union_all";
 
@@ -745,7 +707,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testCreateInvalidBucketedTable()
-            throws Exception
     {
         testCreateInvalidBucketedTable(HiveStorageFormat.RCBINARY);
     }
@@ -795,7 +756,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testInsertPartitionedBucketedTableFewRows()
-            throws Exception
     {
         // go through all storage formats to make sure the empty buckets are correctly created
         for (TestingHiveStorageFormat storageFormat : getAllTestingHiveStorageFormat()) {
@@ -864,8 +824,30 @@ public class TestHiveIntegrationSmokeTest
     }
 
     @Test
+    public void testCastNullToColumnTypes()
+    {
+        String tableName = "test_cast_null_to_column_types";
+        Session session = Session.builder(getSession())
+                .setCatalogSessionProperty(catalog, "orc_optimized_writer_enabled", "true")
+                .build();
+
+        assertUpdate(session, "" +
+                "CREATE TABLE " + tableName + " (" +
+                "  col1 bigint," +
+                "  col2 map(bigint, bigint)," +
+                "  partition_key varchar)" +
+                "WITH (" +
+                "  format = 'ORC', " +
+                "  partitioned_by = ARRAY[ 'partition_key' ] " +
+                ")");
+
+        assertUpdate(session, format("INSERT INTO %s (col1) VALUES (1), (2), (3)", tableName), 3);
+
+        assertUpdate("DROP TABLE " + tableName);
+    }
+
+    @Test
     public void testInsertPartitionedBucketedTable()
-            throws Exception
     {
         testInsertPartitionedBucketedTable(HiveStorageFormat.RCBINARY);
     }
@@ -909,7 +891,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testInsertPartitionedBucketedTableWithUnionAll()
-            throws Exception
     {
         testInsertPartitionedBucketedTableWithUnionAll(HiveStorageFormat.RCBINARY);
     }
@@ -957,7 +938,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void insertTable()
-            throws Exception
     {
         for (TestingHiveStorageFormat storageFormat : getAllTestingHiveStorageFormat()) {
             if (insertOperationsSupported(storageFormat.getFormat())) {
@@ -1044,7 +1024,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void insertPartitionedTable()
-            throws Exception
     {
         for (TestingHiveStorageFormat storageFormat : getAllTestingHiveStorageFormat()) {
             insertPartitionedTable(storageFormat.getSession(), storageFormat.getFormat());
@@ -1106,6 +1085,9 @@ public class TestHiveIntegrationSmokeTest
                 "SHOW PARTITIONS FROM test_insert_partitioned_table WHERE order_status = 'O'",
                 "SELECT DISTINCT shippriority, orderstatus FROM orders WHERE orderstatus = 'O'");
 
+        assertQueryFails(session, "SHOW PARTITIONS FROM test_insert_partitioned_table WHERE no_such_column = 1", "line \\S*: Column 'no_such_column' cannot be resolved");
+        assertQueryFails(session, "SHOW PARTITIONS FROM test_insert_partitioned_table WHERE orderkey = 1", "line \\S*: Column 'orderkey' cannot be resolved");
+
         assertUpdate(session, "DROP TABLE test_insert_partitioned_table");
 
         assertFalse(getQueryRunner().tableExists(session, "test_insert_partitioned_table"));
@@ -1113,7 +1095,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testInsertPartitionedTableExistingPartition()
-            throws Exception
     {
         for (TestingHiveStorageFormat storageFormat : getAllTestingHiveStorageFormat()) {
             testInsertPartitionedTableExistingPartition(storageFormat.getSession(), storageFormat.getFormat());
@@ -1169,8 +1150,27 @@ public class TestHiveIntegrationSmokeTest
     }
 
     @Test
+    public void testNullPartitionValues()
+    {
+        assertUpdate("" +
+                "CREATE TABLE test_null_partition (test VARCHAR, part VARCHAR)\n" +
+                "WITH (partitioned_by = ARRAY['part'])");
+
+        assertUpdate("INSERT INTO test_null_partition VALUES ('hello', 'test'), ('world', null)", 2);
+
+        assertQuery(
+                "SELECT * FROM test_null_partition",
+                "VALUES ('hello', 'test'), ('world', null)");
+
+        assertQuery(
+                "SELECT * FROM \"test_null_partition$partitions\"",
+                "VALUES 'test', null");
+
+        assertUpdate("DROP TABLE test_null_partition");
+    }
+
+    @Test
     public void testPartitionPerScanLimit()
-            throws Exception
     {
         TestingHiveStorageFormat storageFormat = new TestingHiveStorageFormat(getSession(), HiveStorageFormat.DWRF);
         testPartitionPerScanLimit(storageFormat.getSession(), storageFormat.getFormat());
@@ -1210,6 +1210,31 @@ public class TestHiveIntegrationSmokeTest
             assertUpdate(session, insertPartitions, 100);
         }
 
+        // we are not constrained by hive.max-partitions-per-scan when listing partitions
+        assertQuery(
+                session,
+                "SHOW PARTITIONS FROM " + tableName + " WHERE part > 490 and part <= 500",
+                "VALUES 491, 492, 493, 494, 495, 496, 497, 498, 499, 500");
+
+        assertQuery(
+                session,
+                "SHOW PARTITIONS FROM " + tableName + " WHERE part < 0",
+                "SELECT null WHERE false");
+
+        assertQuery(
+                session,
+                "SHOW PARTITIONS FROM " + tableName,
+                "VALUES " + LongStream.range(0, 1200)
+                        .mapToObj(String::valueOf)
+                        .collect(joining(",")));
+
+        assertQuery(
+                session,
+                "SELECT * FROM \"" + tableName + "$partitions\"",
+                "VALUES " + LongStream.range(0, 1200)
+                        .mapToObj(String::valueOf)
+                        .collect(joining(",")));
+
         // verify can query 1000 partitions
         assertQuery(
                 session,
@@ -1240,8 +1265,75 @@ public class TestHiveIntegrationSmokeTest
     }
 
     @Test
+    public void testShowColumnsFromPartitions()
+    {
+        String tableName = "test_show_columns_from_partitions";
+
+        @Language("SQL") String createTable = "" +
+                "CREATE TABLE " + tableName + " " +
+                "(" +
+                "  foo VARCHAR," +
+                "  part1 BIGINT," +
+                "  part2 VARCHAR" +
+                ") " +
+                "WITH (" +
+                "partitioned_by = ARRAY[ 'part1', 'part2' ]" +
+                ") ";
+
+        assertUpdate(getSession(), createTable);
+
+        assertQuery(
+                getSession(),
+                "SHOW COLUMNS FROM \"" + tableName + "$partitions\"",
+                "VALUES ('part1', 'bigint', '', ''), ('part2', 'varchar', '', '')");
+
+        assertQueryFails(
+                getSession(),
+                "SHOW COLUMNS FROM \"$partitions\"",
+                ".*Table '.*\\.tpch\\.\\$partitions' does not exist");
+
+        assertQueryFails(
+                getSession(),
+                "SHOW COLUMNS FROM \"orders$partitions\"",
+                ".*Table '.*\\.tpch\\.orders\\$partitions' does not exist");
+
+        assertQueryFails(
+                getSession(),
+                "SHOW COLUMNS FROM \"blah$partitions\"",
+                ".*Table '.*\\.tpch\\.blah\\$partitions' does not exist");
+    }
+
+    @Test
+    public void testShowPartitionsFromPartitionsSystemTable()
+    {
+        String tableName = "test_show_partitions_from_partitions";
+
+        @Language("SQL") String createTable = "" +
+                "CREATE TABLE " + tableName + " " +
+                "(" +
+                "  foo VARCHAR," +
+                "  part1 BIGINT," +
+                "  part2 VARCHAR" +
+                ") " +
+                "WITH (" +
+                "partitioned_by = ARRAY[ 'part1', 'part2' ]" +
+                ") ";
+
+        assertUpdate(getSession(), createTable);
+
+        assertQueryFails(
+                getSession(),
+                "SHOW PARTITIONS FROM \"" + tableName + "$partitions\"",
+                ".*Table does not have partition columns: .*\\.tpch.test_show_partitions_from_partitions\\$partitions");
+
+        assertQueryFails(
+                getSession(),
+                "SHOW PARTITIONS FROM \"non_existent$partitions\"",
+                ".*Table '.*\\.tpch\\.non_existent\\$partitions' does not exist");
+    }
+
+    @Test
     public void testInsertUnpartitionedTable()
-            throws Exception
     {
         for (TestingHiveStorageFormat storageFormat : getAllTestingHiveStorageFormat()) {
             testInsertUnpartitionedTable(storageFormat.getSession(), storageFormat.getFormat());
@@ -1292,7 +1384,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testDeleteFromUnpartitionedTable()
-            throws Exception
     {
         assertUpdate("CREATE TABLE test_delete_unpartitioned AS SELECT orderstatus FROM tpch.tiny.orders", "SELECT count(*) from orders");
 
@@ -1308,7 +1399,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testMetadataDelete()
-            throws Exception
     {
         @Language("SQL") String createTable = "" +
                 "CREATE TABLE test_metadata_delete " +
@@ -1421,7 +1511,6 @@ public class TestHiveIntegrationSmokeTest
     // TODO: These should be moved to another class, when more connectors support arrays
     @Test
     public void testArrays()
-            throws Exception
     {
         assertUpdate("CREATE TABLE tmp_array1 AS SELECT ARRAY[1, 2, NULL] AS col", 1);
         assertQuery("SELECT col[2] FROM tmp_array1", "SELECT 2");
@@ -1464,7 +1553,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testTemporalArrays()
-            throws Exception
     {
         assertUpdate("CREATE TABLE tmp_array11 AS SELECT ARRAY[DATE '2014-09-30'] AS col", 1);
         assertOneNotNullResult("SELECT col[1] FROM tmp_array11");
@@ -1474,7 +1562,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testMaps()
-            throws Exception
     {
         assertUpdate("CREATE TABLE tmp_map1 AS SELECT MAP(ARRAY[0,1], ARRAY[2,NULL]) AS col", 1);
         assertQuery("SELECT col[0] FROM tmp_map1", "SELECT 2");
@@ -1516,7 +1603,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testRows()
-            throws Exception
     {
         assertUpdate("CREATE TABLE tmp_row1 AS SELECT cast(row(CAST(1 as BIGINT), CAST(NULL as BIGINT)) AS row(col0 bigint, col1 bigint)) AS a", 1);
         assertQuery(
@@ -1526,7 +1612,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testComplex()
-            throws Exception
     {
         assertUpdate("CREATE TABLE tmp_complex1 AS SELECT " +
                         "ARRAY [MAP(ARRAY['a', 'b'], ARRAY[2.0E0, 4.0E0]), MAP(ARRAY['c', 'd'], ARRAY[12.0E0, 14.0E0])] AS a",
@@ -1539,7 +1624,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testBucketedCatalog()
-            throws Exception
     {
         String bucketedCatalog = bucketedSession.getCatalog().get();
         String bucketedSchema = bucketedSession.getSchema().get();
@@ -1555,7 +1639,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testBucketedExecution()
-            throws Exception
     {
         assertQuery(bucketedSession, "select count(*) a from orders t1 join orders t2 on t1.custkey=t2.custkey");
         assertQuery(bucketedSession, "select count(*) a from orders t1 join customer t2 on t1.custkey=t2.custkey", "SELECT count(*) from orders");
@@ -1572,34 +1655,39 @@ public class TestHiveIntegrationSmokeTest
     @Test
     public void testScaleWriters()
     {
-        // small table that will only have one writer
-        assertUpdate(
-                Session.builder(getSession())
-                        .setSystemProperty("scale_writers", "true")
-                        .setSystemProperty("writer_min_size", "32MB")
-                        .build(),
-                "CREATE TABLE scale_writers_small AS SELECT * FROM tpch.tiny.orders",
-                (long) computeActual("SELECT count(*) FROM tpch.tiny.orders").getOnlyValue());
+        try {
+            // small table that will only have one writer
+            assertUpdate(
+                    Session.builder(getSession())
+                            .setSystemProperty("scale_writers", "true")
+                            .setSystemProperty("writer_min_size", "32MB")
+                            .build(),
+                    "CREATE TABLE scale_writers_small AS SELECT * FROM tpch.tiny.orders",
+                    (long) computeActual("SELECT count(*) FROM tpch.tiny.orders").getOnlyValue());
 
-        assertEquals(computeActual("SELECT count(DISTINCT \"$path\") FROM scale_writers_small").getOnlyValue(), 1L);
+            assertEquals(computeActual("SELECT count(DISTINCT \"$path\") FROM scale_writers_small").getOnlyValue(), 1L);
 
-        // large table that will scale writers to all machines
-        assertUpdate(
-                Session.builder(getSession())
-                        .setSystemProperty("scale_writers", "true")
-                        .setSystemProperty("writer_min_size", "4MB")
-                        .build(),
-                "CREATE TABLE scale_writers_large WITH (format = 'RCBINARY') AS SELECT * FROM tpch.sf2.orders",
-                (long) computeActual("SELECT count(*) FROM tpch.sf2.orders").getOnlyValue());
+            // large table that will scale writers to all machines
+            assertUpdate(
+                    Session.builder(getSession())
+                            .setSystemProperty("scale_writers", "true")
+                            .setSystemProperty("writer_min_size", "4MB")
+                            .build(),
+                    "CREATE TABLE scale_writers_large WITH (format = 'RCBINARY') AS SELECT * FROM tpch.sf2.orders",
+                    (long) computeActual("SELECT count(*) FROM tpch.sf2.orders").getOnlyValue());
 
-        assertEquals(
-                computeActual("SELECT count(DISTINCT \"$path\") FROM scale_writers_large"),
-                computeActual("SELECT count(*) FROM system.runtime.nodes"));
+            assertEquals(
+                    computeActual("SELECT count(DISTINCT \"$path\") FROM scale_writers_large"),
+                    computeActual("SELECT count(*) FROM system.runtime.nodes"));
+        }
+        finally {
+            assertUpdate("DROP TABLE IF EXISTS scale_writers_large");
+            assertUpdate("DROP TABLE IF EXISTS scale_writers_small");
+        }
     }
 
     @Test
     public void testShowCreateTable()
-            throws Exception
     {
         String createTableSql = format("" +
                         "CREATE TABLE %s.%s.%s (\n" +
@@ -1679,7 +1767,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testPathHiddenColumn()
-            throws Exception
     {
         for (TestingHiveStorageFormat storageFormat : getAllTestingHiveStorageFormat()) {
             doTestPathHiddenColumn(storageFormat.getSession(), storageFormat.getFormat());
@@ -1744,7 +1831,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testBucketHiddenColumn()
-            throws Exception
     {
         @Language("SQL") String createTable = "CREATE TABLE test_bucket_hidden_column " +
                 "WITH (" +
@@ -1895,8 +1981,18 @@ public class TestHiveIntegrationSmokeTest
     }
 
     @Test
+    public void testAddColumn()
+    {
+        assertUpdate("CREATE TABLE test_add_column (a bigint COMMENT 'test comment AAA')");
+        assertUpdate("ALTER TABLE test_add_column ADD COLUMN b bigint COMMENT 'test comment BBB'");
+        assertQueryFails("ALTER TABLE test_add_column ADD COLUMN a varchar", ".* Column 'a' already exists");
+        assertQueryFails("ALTER TABLE test_add_column ADD COLUMN c bad_type", ".* Unknown type 'bad_type' for column 'c'");
+        assertQuery("SHOW COLUMNS FROM test_add_column", "VALUES ('a', 'bigint', '', 'test comment AAA'), ('b', 'bigint', '', 'test comment BBB')");
+        assertUpdate("DROP TABLE test_add_column");
+    }
+
+    @Test
     public void testRenameColumn()
-            throws Exception
     {
         @Language("SQL") String createTable = "" +
                 "CREATE TABLE test_rename_column\n" +
@@ -1917,7 +2013,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testDropColumn()
-            throws Exception
     {
         @Language("SQL") String createTable = "" +
                 "CREATE TABLE test_drop_column\n" +
@@ -1951,7 +2046,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testOrderByChar()
-            throws Exception
     {
         assertUpdate("CREATE TABLE char_order_by (c_char char(2))");
         assertUpdate("INSERT INTO char_order_by (c_char) VALUES" +
@@ -1978,7 +2072,6 @@ public class TestHiveIntegrationSmokeTest
      */
     @Test
     public void testPredicatePushDownToTableScan()
-            throws Exception
     {
         // Test not specific to Hive, but needs a connector supporting table creation
 
@@ -2031,10 +2124,39 @@ public class TestHiveIntegrationSmokeTest
                             "SELECT orderkey keyN, comment valueN FROM orders",
                     15000);
             assertUpdate(
-                    "CREATE TABLE test_grouped_joinP\n" +
-                            "WITH (bucket_count = 13, bucketed_by = ARRAY['keyP']) AS\n" +
-                            "SELECT orderkey keyP, comment valueP FROM orders WHERE orderkey % 2 = 0",
-                    7500);
+                    "CREATE TABLE test_grouped_joinDual\n" +
+                            "WITH (bucket_count = 13, bucketed_by = ARRAY['keyD']) AS\n" +
+                            "SELECT orderkey keyD, comment valueD FROM orders CROSS JOIN UNNEST(repeat(NULL, 2))",
+                    30000);
+
+            // NOT grouped execution; default
+            Session notColocated = Session.builder(getSession())
+                    .setSystemProperty(COLOCATED_JOIN, "false")
+                    .setSystemProperty(GROUPED_EXECUTION_FOR_AGGREGATION, "false")
+                    .build();
+            // Co-located JOIN with all groups at once
+            Session colocatedAllGroupsAtOnce = Session.builder(getSession())
+                    .setSystemProperty(COLOCATED_JOIN, "true")
+                    .setSystemProperty(GROUPED_EXECUTION_FOR_AGGREGATION, "true")
+                    .setSystemProperty(CONCURRENT_LIFESPANS_PER_NODE, "-1")
+                    .build();
+            // Co-located JOIN, 1 group per worker at a time
+            Session colocatedOneGroupAtATime = Session.builder(getSession())
+                    .setSystemProperty(COLOCATED_JOIN, "true")
+                    .setSystemProperty(GROUPED_EXECUTION_FOR_AGGREGATION, "true")
+                    .setSystemProperty(CONCURRENT_LIFESPANS_PER_NODE, "1")
+                    .build();
+            // Broadcast JOIN, 1 group per worker at a time
+            Session broadcastOneGroupAtATime = Session.builder(getSession())
+                    .setSystemProperty(DISTRIBUTED_JOIN, "false")
+                    .setSystemProperty(COLOCATED_JOIN, "true")
+                    .setSystemProperty(GROUPED_EXECUTION_FOR_AGGREGATION, "true")
+                    .setSystemProperty(CONCURRENT_LIFESPANS_PER_NODE, "1")
+                    .build();
+
+            //
+            // JOIN
+            // ====
 
             @Language("SQL") String joinThreeBucketedTable =
                     "SELECT key1, value1, key2, value2, key3, value3\n" +
@@ -2050,66 +2172,173 @@ public class TestHiveIntegrationSmokeTest
                             "ON key1 = key2\n" +
                             "JOIN test_grouped_joinN\n" +
                             "ON key2 = keyN";
-            @Language("SQL") String expectedQuery = "SELECT orderkey, comment, orderkey, comment, orderkey, comment from orders";
+            @Language("SQL") String expectedJoinQuery = "SELECT orderkey, comment, orderkey, comment, orderkey, comment from orders";
             @Language("SQL") String leftJoinBucketedTable =
-                    "SELECT key1, value1, keyP, valueP\n" +
+                    "SELECT key1, value1, key2, value2\n" +
                             "FROM test_grouped_join1\n" +
-                            "LEFT JOIN test_grouped_joinP\n" +
-                            "ON key1 = keyP";
+                            "LEFT JOIN (SELECT * FROM test_grouped_join2 WHERE key2 % 2 = 0)\n" +
+                            "ON key1 = key2";
             @Language("SQL") String rightJoinBucketedTable =
-                    "SELECT key1, value1, keyP, valueP\n" +
-                            "FROM test_grouped_joinP\n" +
+                    "SELECT key1, value1, key2, value2\n" +
+                            "FROM (SELECT * FROM test_grouped_join2 WHERE key2 % 2 = 0)\n" +
                             "RIGHT JOIN test_grouped_join1\n" +
-                            "ON key1 = keyP";
-            @Language("SQL") String expectedOuterQuery = "SELECT orderkey, comment, CASE mod(orderkey, 2) WHEN 0 THEN orderkey END, CASE mod(orderkey, 2) WHEN 0 THEN comment END from orders";
+                            "ON key1 = key2";
+            @Language("SQL") String expectedOuterJoinQuery = "SELECT orderkey, comment, CASE mod(orderkey, 2) WHEN 0 THEN orderkey END, CASE mod(orderkey, 2) WHEN 0 THEN comment END from orders";
 
-            // NOT grouped execution; default
-            Session notColocated = Session.builder(getSession())
-                    .setSystemProperty(COLOCATED_JOIN, "false")
-                    .build();
-            // Co-located JOIN with all groups at once
-            Session colocatedAllGroupsAtOnce = Session.builder(getSession())
-                    .setSystemProperty(COLOCATED_JOIN, "true")
-                    .setSystemProperty(CONCURRENT_LIFESPANS_PER_NODE, "-1")
-                    .build();
-            // Co-located JOIN, 1 group per worker at a time
-            Session colocatedOneGroupAtATime = Session.builder(getSession())
-                    .setSystemProperty(COLOCATED_JOIN, "true")
-                    .setSystemProperty(CONCURRENT_LIFESPANS_PER_NODE, "1")
-                    .build();
+            assertQuery(notColocated, joinThreeBucketedTable, expectedJoinQuery);
+            assertQuery(notColocated, leftJoinBucketedTable, expectedOuterJoinQuery);
+            assertQuery(notColocated, rightJoinBucketedTable, expectedOuterJoinQuery);
 
-            assertQuery(notColocated, joinThreeBucketedTable, expectedQuery);
-            assertQuery(notColocated, leftJoinBucketedTable, expectedOuterQuery);
-            assertQuery(notColocated, rightJoinBucketedTable, expectedOuterQuery);
+            assertQuery(colocatedAllGroupsAtOnce, joinThreeBucketedTable, expectedJoinQuery);
+            assertQuery(colocatedAllGroupsAtOnce, joinThreeMixedTable, expectedJoinQuery);
+            assertQuery(colocatedOneGroupAtATime, joinThreeBucketedTable, expectedJoinQuery);
+            assertQuery(colocatedOneGroupAtATime, joinThreeMixedTable, expectedJoinQuery);
 
-            assertQuery(colocatedAllGroupsAtOnce, joinThreeBucketedTable, expectedQuery);
-            assertQuery(colocatedAllGroupsAtOnce, joinThreeMixedTable, expectedQuery);
-            assertQuery(colocatedOneGroupAtATime, joinThreeBucketedTable, expectedQuery);
-            assertQuery(colocatedOneGroupAtATime, joinThreeMixedTable, expectedQuery);
+            assertQuery(colocatedAllGroupsAtOnce, leftJoinBucketedTable, expectedOuterJoinQuery);
+            assertQuery(colocatedAllGroupsAtOnce, rightJoinBucketedTable, expectedOuterJoinQuery);
+            assertQuery(colocatedOneGroupAtATime, leftJoinBucketedTable, expectedOuterJoinQuery);
+            assertQuery(colocatedOneGroupAtATime, rightJoinBucketedTable, expectedOuterJoinQuery);
 
-            assertQuery(colocatedAllGroupsAtOnce, leftJoinBucketedTable, expectedOuterQuery);
-            assertQuery(colocatedAllGroupsAtOnce, rightJoinBucketedTable, expectedOuterQuery);
-            assertQuery(colocatedOneGroupAtATime, leftJoinBucketedTable, expectedOuterQuery);
-            assertQuery(colocatedOneGroupAtATime, rightJoinBucketedTable, expectedOuterQuery);
+            //
+            // UNION ALL / GROUP BY
+            // ====================
+
+            @Language("SQL") String groupBySingleBucketedTable =
+                    "SELECT\n" +
+                            "  keyD,\n" +
+                            "  count(valueD)\n" +
+                            "FROM\n" +
+                            "  test_grouped_joinDual\n" +
+                            "GROUP BY keyD";
+            @Language("SQL") String expectedSingleGroupByQuery = "SELECT orderkey, 2 from orders";
+            @Language("SQL") String groupByThreeBucketedTable =
+                    "SELECT\n" +
+                            "  key\n" +
+                            ", arbitrary(value1)\n" +
+                            ", arbitrary(value2)\n" +
+                            ", arbitrary(value3)\n" +
+                            "FROM (\n" +
+                            "  SELECT key1 key, value1, NULL value2, NULL value3\n" +
+                            "  FROM test_grouped_join1\n" +
+                            "UNION ALL\n" +
+                            "  SELECT key2 key, NULL value1, value2, NULL value3\n" +
+                            "  FROM test_grouped_join2\n" +
+                            "  WHERE key2 % 2 = 0\n" +
+                            "UNION ALL\n" +
+                            "  SELECT key3 key, NULL value1, NULL value2, value3\n" +
+                            "  FROM test_grouped_join3\n" +
+                            "  WHERE key3 % 3 = 0\n" +
+                            ")\n" +
+                            "GROUP BY key";
+            @Language("SQL") String groupByThreeMixedTable =
+                    "SELECT\n" +
+                            "  key\n" +
+                            ", arbitrary(value1)\n" +
+                            ", arbitrary(value2)\n" +
+                            ", arbitrary(valueN)\n" +
+                            "FROM (\n" +
+                            "  SELECT key1 key, value1, NULL value2, NULL valueN\n" +
+                            "  FROM test_grouped_join1\n" +
+                            "UNION ALL\n" +
+                            "  SELECT key2 key, NULL value1, value2, NULL valueN\n" +
+                            "  FROM test_grouped_join2\n" +
+                            "  WHERE key2 % 2 = 0\n" +
+                            "UNION ALL\n" +
+                            "  SELECT keyN key, NULL value1, NULL value2, valueN\n" +
+                            "  FROM test_grouped_joinN\n" +
+                            "  WHERE keyN % 3 = 0\n" +
+                            ")\n" +
+                            "GROUP BY key";
+            @Language("SQL") String expectedThreeGroupByQuery = "SELECT orderkey, comment, CASE mod(orderkey, 2) WHEN 0 THEN comment END, CASE mod(orderkey, 3) WHEN 0 THEN comment END from orders";
+
+            // Eligible GROUP BYs run in the same fragment regardless of colocated_join flag
+            assertQuery(colocatedAllGroupsAtOnce, groupBySingleBucketedTable, expectedSingleGroupByQuery);
+            assertQuery(colocatedOneGroupAtATime, groupBySingleBucketedTable, expectedSingleGroupByQuery);
+            assertQuery(colocatedAllGroupsAtOnce, groupByThreeBucketedTable, expectedThreeGroupByQuery);
+            assertQuery(colocatedOneGroupAtATime, groupByThreeBucketedTable, expectedThreeGroupByQuery);
+
+            // cannot be executed in a grouped manner but should still produce correct result
+            assertQuery(colocatedOneGroupAtATime, groupByThreeMixedTable, expectedThreeGroupByQuery);
+
+            //
+            // GROUP BY and JOIN mixed
+            // ========================
+            @Language("SQL") String joinGroupedWithGrouped =
+                    "SELECT key1, count1, count2\n" +
+                            "FROM (\n" +
+                            "  SELECT keyD key1, count(valueD) count1\n" +
+                            "  FROM test_grouped_joinDual\n" +
+                            "  GROUP BY keyD\n" +
+                            ") JOIN (\n" +
+                            "  SELECT keyD key2, count(valueD) count2\n" +
+                            "  FROM test_grouped_joinDual\n" +
+                            "  GROUP BY keyD\n" +
+                            ")\n" +
+                            "ON key1 = key2";
+            @Language("SQL") String expectedJoinGroupedWithGrouped = "SELECT orderkey, 2, 2 from orders";
+            @Language("SQL") String joinGroupedWithUngrouped =
+                    "SELECT keyD, countD, valueN\n" +
+                            "FROM (\n" +
+                            "  SELECT keyD, count(valueD) countD\n" +
+                            "  FROM test_grouped_joinDual\n" +
+                            "  GROUP BY keyD\n" +
+                            ") JOIN (\n" +
+                            "  SELECT keyN, valueN\n" +
+                            "  FROM test_grouped_joinN\n" +
+                            ")\n" +
+                            "ON keyD = keyN";
+            @Language("SQL") String expectedJoinGroupedWithUngrouped = "SELECT orderkey, 2, comment from orders";
+            @Language("SQL") String joinUngroupedWithGrouped =
+                    "SELECT keyN, valueN, countD\n" +
+                            "FROM (\n" +
+                            "  SELECT keyN, valueN\n" +
+                            "  FROM test_grouped_joinN\n" +
+                            ") JOIN (\n" +
+                            "  SELECT keyD, count(valueD) countD\n" +
+                            "  FROM test_grouped_joinDual\n" +
+                            "  GROUP BY keyD\n" +
+                            ")\n" +
+                            "ON keyN = keyD";
+            @Language("SQL") String expectedJoinUngroupedWithGrouped = "SELECT orderkey, comment, 2 from orders";
+            @Language("SQL") String groupOnJoinResult =
+                    "SELECT keyD, count(valueD), count(valueN)\n" +
+                            "FROM\n" +
+                            "  test_grouped_joinDual\n" +
+                            "JOIN\n" +
+                            "  test_grouped_joinN\n" +
+                            "ON keyD=keyN\n" +
+                            "GROUP BY keyD";
+            @Language("SQL") String expectedGroupOnJoinResult = "SELECT orderkey, 2, 2 from orders";
+
+            // Eligible GROUP BYs run in the same fragment regardless of colocated_join flag
+            assertQuery(colocatedAllGroupsAtOnce, joinGroupedWithGrouped, expectedJoinGroupedWithGrouped);
+            assertQuery(colocatedOneGroupAtATime, joinGroupedWithGrouped, expectedJoinGroupedWithGrouped);
+            assertQuery(colocatedAllGroupsAtOnce, joinGroupedWithUngrouped, expectedJoinGroupedWithUngrouped);
+            assertQuery(colocatedOneGroupAtATime, joinGroupedWithUngrouped, expectedJoinGroupedWithUngrouped);
+            assertQuery(colocatedAllGroupsAtOnce, groupOnJoinResult, expectedGroupOnJoinResult);
+            assertQuery(colocatedOneGroupAtATime, groupOnJoinResult, expectedGroupOnJoinResult);
+            assertQuery(broadcastOneGroupAtATime, groupOnJoinResult, expectedGroupOnJoinResult);
+
+            // cannot be executed in a grouped manner but should still produce correct result
+            assertQuery(colocatedOneGroupAtATime, joinUngroupedWithGrouped, expectedJoinUngroupedWithGrouped);
         }
         finally {
             assertUpdate("DROP TABLE IF EXISTS test_grouped_join1");
             assertUpdate("DROP TABLE IF EXISTS test_grouped_join2");
             assertUpdate("DROP TABLE IF EXISTS test_grouped_join3");
             assertUpdate("DROP TABLE IF EXISTS test_grouped_joinN");
+            assertUpdate("DROP TABLE IF EXISTS test_grouped_joinDual");
         }
     }
 
     @Test
     public void testRcTextCharDecoding()
-            throws Exception
     {
         testRcTextCharDecoding(false);
         testRcTextCharDecoding(true);
     }
 
     private void testRcTextCharDecoding(boolean rcFileOptimizedWriterEnabled)
-            throws Exception
     {
         String catalog = getSession().getCatalog().get();
         Session session = Session.builder(getSession())
@@ -2129,7 +2358,6 @@ public class TestHiveIntegrationSmokeTest
 
     @Test
     public void testInvalidPartitionValue()
-            throws Exception
     {
         assertUpdate("CREATE TABLE invalid_partition_value (a int, b varchar) WITH (partitioned_by = ARRAY['b'])");
         assertQueryFails(
@@ -2140,6 +2368,39 @@ public class TestHiveIntegrationSmokeTest
         assertQueryFails(
                 "CREATE TABLE invalid_partition_value (a, b) WITH (partitioned_by = ARRAY['b']) AS SELECT 4, chr(9731)",
                 "\\QHive partition keys can only contain printable ASCII characters (0x20 - 0x7E). Invalid value: E2 98 83\\E");
+    }
+
+    @Test
+    public void testCurrentUserInView()
+    {
+        checkState(getSession().getCatalog().isPresent(), "catalog is not set");
+        checkState(getSession().getSchema().isPresent(), "schema is not set");
+        String testAccountsUnqualifiedName = "test_accounts";
+        String testAccountsViewUnqualifiedName = "test_accounts_view";
+        String testAccountsViewFullyQualifiedName = format("%s.%s.%s", getSession().getCatalog().get(), getSession().getSchema().get(), testAccountsViewUnqualifiedName);
+        assertUpdate(format("CREATE TABLE %s AS SELECT user_name, account_name" +
+                "  FROM (VALUES ('user1', 'account1'), ('user2', 'account2'))" +
+                "  t (user_name, account_name)", testAccountsUnqualifiedName), 2);
+        assertUpdate(format("CREATE VIEW %s AS SELECT account_name FROM test_accounts WHERE user_name = CURRENT_USER", testAccountsViewUnqualifiedName));
+        assertUpdate(format("GRANT SELECT ON %s TO user1", testAccountsViewFullyQualifiedName));
+        assertUpdate(format("GRANT SELECT ON %s TO user2", testAccountsViewFullyQualifiedName));
+
+        Session user1 = testSessionBuilder()
+                .setCatalog(getSession().getCatalog().get())
+                .setSchema(getSession().getSchema().get())
+                .setIdentity(new Identity("user1", getSession().getIdentity().getPrincipal()))
+                .build();
+
+        Session user2 = testSessionBuilder()
+                .setCatalog(getSession().getCatalog().get())
+                .setSchema(getSession().getSchema().get())
+                .setIdentity(new Identity("user2", getSession().getIdentity().getPrincipal()))
+                .build();
+
+        assertQuery(user1, "SELECT account_name FROM test_accounts_view", "VALUES 'account1'");
+        assertQuery(user2, "SELECT account_name FROM test_accounts_view", "VALUES 'account2'");
+        assertUpdate("DROP VIEW test_accounts_view");
+        assertUpdate("DROP TABLE test_accounts");
     }
 
     private Session getParallelWriteSession()
