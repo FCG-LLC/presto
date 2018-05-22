@@ -13,6 +13,7 @@
  */
 package co.llective.presto.hyena;
 
+import co.llective.hyena.api.FilterType;
 import co.llective.hyena.api.ScanAndFilters;
 import co.llective.hyena.api.ScanComparison;
 import co.llective.hyena.api.ScanFilter;
@@ -167,7 +168,7 @@ public class HyenaPredicatesUtil
         ScanAndFilters andFilters = new ScanAndFilters();
         if (column.getColumnType() == VARCHAR) {
             Slice val = (Slice) singleValue;
-            andFilters.add(getNewScanFilter(column, comparisonOperator, val.toStringUtf8()));
+            andFilters.add(getNewScanFilter(column, ScanComparison.Contains, val.toStringUtf8()));
         }
         else {
             Long val = (Long) singleValue;
@@ -178,6 +179,13 @@ public class HyenaPredicatesUtil
 
     private ScanFilter getNewScanFilter(HyenaColumnHandle column, ScanComparison op, Object value)
     {
+        if (column.getHyenaType().mapToFilterType() == FilterType.String) {
+            return new ScanFilter(
+                    column.getOrdinalPosition(),
+                    ScanComparison.Contains,
+                    column.getHyenaType().mapToFilterType(),
+                    value);
+        }
         return new ScanFilter(
             column.getOrdinalPosition(),
             op,
