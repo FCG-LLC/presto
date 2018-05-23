@@ -166,7 +166,7 @@ public class CassandraPartitionManager
                         }
                         return ImmutableSet.of();
                     },
-                    allOrNone -> ImmutableSet.of());
+                    allOrNone -> ImmutableSet.of(), likeValue -> ImmutableSet.of());
             partitionColumnValues.add(values);
         }
         return Sets.cartesianProduct(partitionColumnValues.build());

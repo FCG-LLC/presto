@@ -158,7 +158,7 @@ public class CassandraClusteringPredicatesExtractor
                             return predicate;
                         }
                         return null;
-                    }, allOrNone -> null);
+                    }, allOrNone -> null, likeValue -> null);
 
             if (predicateString == null) {
                 break;

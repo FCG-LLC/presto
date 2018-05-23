@@ -209,13 +209,13 @@ public final class SortedRangeSet
         return new ValuesProcessor()
         {
             @Override
-            public <T> T transform(Function<Ranges, T> rangesFunction, Function<DiscreteValues, T> valuesFunction, Function<AllOrNone, T> allOrNoneFunction)
+            public <T> T transform(Function<Ranges, T> rangesFunction, Function<DiscreteValues, T> valuesFunction, Function<AllOrNone, T> allOrNoneFunction, Function<LikeValue, T> likeValueFunction)
             {
                 return rangesFunction.apply(getRanges());
             }
 
             @Override
-            public void consume(Consumer<Ranges> rangesConsumer, Consumer<DiscreteValues> valuesConsumer, Consumer<AllOrNone> allOrNoneConsumer)
+            public void consume(Consumer<Ranges> rangesConsumer, Consumer<DiscreteValues> valuesConsumer, Consumer<AllOrNone> allOrNoneConsumer, Consumer<LikeValue> likeValueConsumer)
             {
                 rangesConsumer.accept(getRanges());
             }

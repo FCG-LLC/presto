@@ -29,7 +29,8 @@ import static java.util.stream.Collectors.toList;
 @JsonSubTypes({
         @JsonSubTypes.Type(value = EquatableValueSet.class, name = "equatable"),
         @JsonSubTypes.Type(value = SortedRangeSet.class, name = "sortable"),
-        @JsonSubTypes.Type(value = AllOrNoneValueSet.class, name = "allOrNone")})
+        @JsonSubTypes.Type(value = AllOrNoneValueSet.class, name = "allOrNone"),
+        @JsonSubTypes.Type(value = LikeValueSet.class, name = "like")})
 public interface ValueSet
 {
     static ValueSet none(Type type)
@@ -113,6 +114,13 @@ public interface ValueSet
      */
     default Ranges getRanges()
     {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * @return like predicate for likeable strings
+     */
+    default LikeValue getLikeValue() {
         throw new UnsupportedOperationException();
     }
 

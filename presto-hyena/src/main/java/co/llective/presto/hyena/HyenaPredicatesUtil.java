@@ -53,7 +53,10 @@ public class HyenaPredicatesUtil
                 },
                 discreteValues -> {
                     throw new NotImplementedException("Discrete values are not handled yet"); },
-                allOrNone -> { /* noop */ }));
+                allOrNone -> { /* noop */ },
+                likeValue -> {
+                    filters.add(new ScanAndFilters(createSingleFilter(column, ScanComparison.Contains, escapeLikeChars(likeValue.getLikeValue().toStringUtf8()))));
+                }));
 
         return filters;
     }

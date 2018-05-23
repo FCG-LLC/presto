@@ -19,6 +19,7 @@ import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.operator.scalar.VarbinaryFunctions;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
+import com.facebook.presto.spi.predicate.LikeValue;
 import com.facebook.presto.spi.type.CharType;
 import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.Decimals;
@@ -157,6 +158,9 @@ public final class LiteralEncoder
         }
 
         if (type instanceof VarcharType) {
+            if (object instanceof LikeValue) {
+                Slice value = ((LikeValue) object).getLikeValue();
+            }
             VarcharType varcharType = (VarcharType) type;
             Slice value = (Slice) object;
             StringLiteral stringLiteral = new StringLiteral(value.toStringUtf8());

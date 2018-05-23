@@ -271,7 +271,10 @@ public final class Domain
                     }
                     return Optional.of(ValueSet.all(values.getType()));
                 },
-                allOrNone -> Optional.empty())
+                allOrNone -> Optional.empty(),
+                //TODO: is that right?
+                likeValue -> Optional.empty()
+        )
                 .orElse(values);
         return Domain.create(simplifiedValueSet, nullAllowed);
     }

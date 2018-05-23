@@ -95,7 +95,8 @@ public class HyenaSplitManager
                     }
                     return ImmutableList.of();
                 },
-                allOrNone -> ImmutableList.of());
+                allOrNone -> ImmutableList.of(),
+                likeValue -> ImmutableList.of());
     }
 
     public boolean prunePartitionOnTs(PartitionInfo partitionInfo, List<Pair<Long, Long>> allowedTsRanges)

@@ -155,7 +155,8 @@ public class TupleDomainOrcPredicate<C>
                     return Optional.of(discreteValues.build());
                 },
                 discreteValues -> Optional.of(discreteValues.getValues()),
-                allOrNone -> allOrNone.isAll() ? Optional.empty() : Optional.of(ImmutableList.of()));
+                allOrNone -> allOrNone.isAll() ? Optional.empty() : Optional.of(ImmutableList.of()),
+                likeValue -> Optional.empty());
     }
 
     // checks whether a value part of the effective predicate is likely to be part of this bloom filter

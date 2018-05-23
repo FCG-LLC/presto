@@ -19,6 +19,7 @@ import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.predicate.DiscreteValues;
 import com.facebook.presto.spi.predicate.Domain;
+import com.facebook.presto.spi.predicate.LikeValue;
 import com.facebook.presto.spi.predicate.Marker;
 import com.facebook.presto.spi.predicate.NullableValue;
 import com.facebook.presto.spi.predicate.Range;
@@ -126,7 +127,8 @@ public final class DomainTranslator
                 discreteValues -> extractDisjuncts(domain.getType(), discreteValues, reference),
                 allOrNone -> {
                     throw new IllegalStateException("Case should not be reachable");
-                }));
+                },
+                likeValue -> extractDisjuncts(domain.getType(), likeValue, reference)));
         // Add nullability disjuncts
         if (domain.isNullAllowed()) {
             disjuncts.add(new IsNullPredicate(reference));
@@ -193,6 +195,13 @@ public final class DomainTranslator
         }
 
         return combineConjuncts(processRange(type, range, reference), excludedPointsExpression);
+    }
+
+    private List<Expression> extractDisjuncts(Type type, LikeValue like, SymbolReference reference)
+    {
+        List<Expression> disjuncts = new ArrayList<>();
+        disjuncts.add(literalEncoder.toExpression(like, type));
+        return disjuncts;
     }
 
     private List<Expression> extractDisjuncts(Type type, Ranges ranges, SymbolReference reference)

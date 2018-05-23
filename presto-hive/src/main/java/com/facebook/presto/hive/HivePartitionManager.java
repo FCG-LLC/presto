@@ -169,7 +169,8 @@ public class HivePartitionManager
                 ValueSet compactValueSet = values.getValuesProcessor().<Optional<ValueSet>>transform(
                         ranges -> ranges.getRangeCount() > threshold ? Optional.of(ValueSet.ofRanges(ranges.getSpan())) : Optional.empty(),
                         discreteValues -> discreteValues.getValues().size() > threshold ? Optional.of(ValueSet.all(values.getType())) : Optional.empty(),
-                        allOrNone -> Optional.empty())
+                        allOrNone -> Optional.empty(),
+                        likeValue -> Optional.empty())
                         .orElse(values);
                 builder.put(hiveColumnHandle, Domain.create(compactValueSet, entry.getValue().isNullAllowed()));
             }

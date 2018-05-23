@@ -211,7 +211,9 @@ public final class PreparedStatementBuilder
 
                 allOrNone -> {
                     throw new IllegalStateException("Case should not be reachable");
-                });
+                },
+
+                likeValue -> columnName + " LIKE " + likeValue.getLikeValue().toStringUtf8());
     }
 
     private static Object getBindValue(int columnIndex, Set<Integer> uuidColumnIndexes, Object value)

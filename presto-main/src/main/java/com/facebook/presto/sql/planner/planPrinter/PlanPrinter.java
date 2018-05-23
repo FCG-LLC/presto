@@ -1352,7 +1352,9 @@ public class PlanPrinter
                         if (allOrNone.isAll()) {
                             parts.add("ALL VALUES");
                         }
-                    });
+                    },
+                    likeValue -> parts.add(
+                            "like " + likeValue.getLikeValue().toStringUtf8()));
 
             return "[" + Joiner.on(", ").join(parts.build()) + "]";
         }
