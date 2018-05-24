@@ -28,6 +28,7 @@ import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.predicate.Utils;
 import com.facebook.presto.spi.predicate.ValueSet;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spi.type.VarcharType;
 import com.facebook.presto.sql.ExpressionUtils;
 import com.facebook.presto.sql.FunctionInvoker;
 import com.facebook.presto.sql.analyzer.ExpressionAnalyzer;
@@ -43,10 +44,12 @@ import com.facebook.presto.sql.tree.InListExpression;
 import com.facebook.presto.sql.tree.InPredicate;
 import com.facebook.presto.sql.tree.IsNotNullPredicate;
 import com.facebook.presto.sql.tree.IsNullPredicate;
+import com.facebook.presto.sql.tree.LikePredicate;
 import com.facebook.presto.sql.tree.LogicalBinaryExpression;
 import com.facebook.presto.sql.tree.NodeRef;
 import com.facebook.presto.sql.tree.NotExpression;
 import com.facebook.presto.sql.tree.NullLiteral;
+import com.facebook.presto.sql.tree.StringLiteral;
 import com.facebook.presto.sql.tree.SymbolReference;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -124,7 +127,6 @@ public final class DomainTranslator
                 allOrNone -> {
                     throw new IllegalStateException("Case should not be reachable");
                 }));
-
         // Add nullability disjuncts
         if (domain.isNullAllowed()) {
             disjuncts.add(new IsNullPredicate(reference));
@@ -766,6 +768,18 @@ public final class DomainTranslator
         protected ExtractionResult visitNullLiteral(NullLiteral node, Boolean complement)
         {
             return new ExtractionResult(TupleDomain.none(), TRUE_LITERAL);
+        }
+
+        @Override
+        protected ExtractionResult visitLikePredicate(LikePredicate node, Boolean complement)
+        {
+            // we are leaving also like predicate to know that it was
+            // a like predicate and not just string-equal filter
+            LikePredicate likePredicate = new LikePredicate(node.getValue(), node.getPattern(), node.getEscape());
+            return new ExtractionResult(
+                    TupleDomain.withColumnDomains(
+                        ImmutableMap.of(Symbol.from(node.getValue()), Domain.singleValue(VarcharType.createUnboundedVarcharType(), ((StringLiteral) node.getPattern()).getSlice()))),
+                    complementIfNecessary(likePredicate, complement));
         }
     }
 

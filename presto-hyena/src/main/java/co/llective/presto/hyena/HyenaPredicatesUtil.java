@@ -168,7 +168,7 @@ public class HyenaPredicatesUtil
         ScanAndFilters andFilters = new ScanAndFilters();
         if (column.getColumnType() == VARCHAR) {
             Slice val = (Slice) singleValue;
-            andFilters.add(getNewScanFilter(column, ScanComparison.Contains, val.toStringUtf8()));
+            andFilters.add(getNewScanFilter(column, ScanComparison.Contains, escapeLikeChars(val.toStringUtf8())));
         }
         else {
             Long val = (Long) singleValue;
@@ -191,5 +191,20 @@ public class HyenaPredicatesUtil
             op,
             column.getHyenaType().mapToFilterType(),
             value);
+    }
+
+    private String escapeLikeChars(String likedValue)
+    {
+        String escapedString = likedValue;
+        if (escapedString.length() == 0) {
+            return escapedString;
+        }
+        if (escapedString.startsWith("%")) {
+            escapedString = escapedString.substring(1, escapedString.length());
+        }
+        if (escapedString.endsWith("%")) {
+            escapedString = escapedString.substring(0, escapedString.length() - 1);
+        }
+        return escapedString;
     }
 }
