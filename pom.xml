@@ -33,20 +33,20 @@
         <tag>0.201</tag>
     </scm>
 
-    <repositories>
-        <repository>
-            <id>nexus01</id>
-            <name>Maven Central Proxy</name>
-            <url>http://nexus.cs.int/repository/maven-central/</url>
-        </repository>
-    </repositories>
-    <pluginRepositories>
-        <pluginRepository>
-            <id>nexus01</id>
-            <name>Maven Central Proxy</name>
-            <url>http://nexus.cs.int/repository/maven-central/</url>
-        </pluginRepository>
-    </pluginRepositories>
+    <!--<repositories>-->
+        <!--<repository>-->
+            <!--<id>nexus01</id>-->
+            <!--<name>Maven Central Proxy</name>-->
+            <!--<url>http://nexus.cs.int/repository/maven-central/</url>-->
+        <!--</repository>-->
+    <!--</repositories>-->
+    <!--<pluginRepositories>-->
+        <!--<pluginRepository>-->
+            <!--<id>nexus01</id>-->
+            <!--<name>Maven Central Proxy</name>-->
+            <!--<url>http://nexus.cs.int/repository/maven-central/</url>-->
+        <!--</pluginRepository>-->
+    <!--</pluginRepositories>-->
 
     <properties>
         <air.main.basedir>${project.basedir}</air.main.basedir>
