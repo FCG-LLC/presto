@@ -167,8 +167,7 @@ public class HyenaPredicatesUtil
     {
         ScanAndFilters andFilters = new ScanAndFilters();
         if (column.getColumnType() == VARCHAR) {
-            Slice val = (Slice) singleValue;
-            andFilters.add(getNewScanFilter(column, ScanComparison.Contains, escapeLikeChars(val.toStringUtf8())));
+            andFilters.add(getNewScanFilter(column, ScanComparison.Contains, singleValue));
         }
         else {
             Long val = (Long) singleValue;
@@ -180,17 +179,33 @@ public class HyenaPredicatesUtil
     private ScanFilter getNewScanFilter(HyenaColumnHandle column, ScanComparison op, Object value)
     {
         if (column.getHyenaType().mapToFilterType() == FilterType.String) {
-            return new ScanFilter(
-                    column.getOrdinalPosition(),
-                    ScanComparison.Contains,
-                    column.getHyenaType().mapToFilterType(),
-                    value);
+            Slice slice = (Slice) value;
+            return createStringFilter(column, op, slice.toStringUtf8());
         }
         return new ScanFilter(
             column.getOrdinalPosition(),
             op,
             column.getHyenaType().mapToFilterType(),
             value);
+    }
+
+    private ScanFilter createStringFilter(HyenaColumnHandle column, ScanComparison op, String value)
+    {
+        if (value.startsWith("%") && value.endsWith("%")) {
+            op = ScanComparison.Contains;
+        }
+        else if (value.startsWith("%")) {
+            op = ScanComparison.EndsWith;
+        }
+        else if (value.endsWith("%")) {
+            op = ScanComparison.StartsWith;
+        }
+
+        return new ScanFilter(
+                column.getOrdinalPosition(),
+                op,
+                column.getHyenaType().mapToFilterType(),
+                escapeLikeChars(value));
     }
 
     private String escapeLikeChars(String likedValue)
