@@ -28,7 +28,7 @@ public final class CallExpression
 {
     private final Signature signature;
     private final Type returnType;
-    private final List<RowExpression> arguments;
+    private List<RowExpression> arguments;
 
     public CallExpression(Signature signature, Type returnType, List<RowExpression> arguments)
     {
@@ -55,6 +55,11 @@ public final class CallExpression
     public List<RowExpression> getArguments()
     {
         return arguments;
+    }
+
+    public void setArguments(List<RowExpression> arguments)
+    {
+        this.arguments = arguments;
     }
 
     @Override
