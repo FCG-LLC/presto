@@ -2,6 +2,7 @@ FROM portus.cs.int:5000/prod/cs-base-java
 LABEL maintainer "devops@collective-sense.com"
 
 ARG destEnv
+ARG debVer
 
 RUN locale-gen en_US.UTF-8 && \
     update-locale LANG=en_US.UTF-8
