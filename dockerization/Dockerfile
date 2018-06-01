@@ -27,7 +27,7 @@ RUN groupadd -g 10036 hyena-tmp && \
    usermod -a -G hyena-tmp presto
 
 RUN apt-get install -y nanomsg
-RUN apt-get install -y presto
+RUN apt-get install -y presto=$debVer
 
 RUN paxctl -c /usr/lib/jvm/java-8-oracle/jre/bin/java && \
     paxctl -m /usr/lib/jvm/java-8-oracle/jre/bin/java
