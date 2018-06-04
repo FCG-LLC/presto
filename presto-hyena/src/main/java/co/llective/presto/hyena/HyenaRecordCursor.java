@@ -283,7 +283,7 @@ public class HyenaRecordCursor
         log.warn("Scan + deserialization time: " + (scanFinish - scanStart) + "ms");
         log.warn("Constructor time: " + (constructorFinish - constructorStart) + "ms");
         log.warn("Iterating time: " + (closeTime - iteratingStart) + "ms");
-        log.warn("Iterated through " + rowPosition + " rows, " + (iteratingTime / rowPosition) + "ms per row");
+        log.warn("Iterated through " + rowPosition + " rows, " + (rowPosition == 0 ? 0 : (iteratingTime / rowPosition)) + "ms per row");
         log.warn("Whole cursor job: " + (closeTime - constructorStart) + "ms");
         //TODO: cancel query in hyenaAPI (send abort request with requestID)
     }
