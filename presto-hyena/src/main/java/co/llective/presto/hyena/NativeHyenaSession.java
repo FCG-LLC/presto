@@ -22,7 +22,6 @@ import co.llective.hyena.api.ScanRequest;
 import co.llective.hyena.api.ScanResult;
 
 import java.io.IOException;
-import java.util.Comparator;
 import java.util.List;
 
 public class NativeHyenaSession
@@ -38,7 +37,6 @@ public class NativeHyenaSession
     @Override
     public Catalog refreshCatalog()
     {
-        // TODO: catalog caching
         try {
             return hyenaApi.refreshCatalog();
         }
@@ -50,9 +48,7 @@ public class NativeHyenaSession
     @Override
     public List<Column> getAvailableColumns()
     {
-        List<Column> columns = refreshCatalog().getColumns();
-        columns.sort(Comparator.comparing(Column::getId));
-        return columns;
+        return refreshCatalog().getColumns();
     }
 
     @Override
