@@ -60,4 +60,4 @@ COPY launcher_entrypoint.sh /opt/presto/launcher_entrypoint.sh
 RUN chown presto:presto /opt/presto/launcher_entrypoint.sh
 
 USER presto
-ENTRYPOINT "/opt/presto/launcher_entrypoint.sh"
+ENTRYPOINT ["/opt/presto/launcher_entrypoint.sh"]

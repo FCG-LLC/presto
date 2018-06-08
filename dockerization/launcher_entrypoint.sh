@@ -4,4 +4,4 @@
 cp -r /opt/presto/config/. /opt/presto/etc/
 
 # run presto
-/opt/presto/bin/launcher run
+exec /opt/presto/bin/launcher run
