@@ -56,5 +56,8 @@ VOLUME /var/presto/data
 
 RUN chown -R presto.presto /opt/presto
 
+COPY launcher_entrypoint.sh /opt/presto/launcher_entrypoint.sh
+RUN chown presto:presto /opt/presto/launcher_entrypoint.sh
+
 USER presto
-CMD /opt/presto/bin/launcher run
+ENTRYPOINT ["/opt/presto/launcher_entrypoint.sh"]
