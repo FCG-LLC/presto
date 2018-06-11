@@ -3,19 +3,62 @@ package com.facebook.presto.spi.predicate;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.VarcharType;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.airlift.slice.Slice;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class LikeValueSet
         implements ValueSet
 {
     private static final Type type = VarcharType.VARCHAR;
-    private final Slice value;
+    private final List<LikeValue> likes;
 
-    public LikeValueSet(Slice value) {
-        this.value = value;
+    @JsonCreator
+    public LikeValueSet(
+            @JsonProperty("likes") List<LikeValue> values)
+    {
+        this.likes = new ArrayList<>(values);
+    }
+
+    static LikeValueSet none() {
+        return new LikeValueSet(Collections.emptyList());
+    }
+
+    //TODO: all()?
+
+    static LikeValueSet of(Type type, Object first, Object... rest) {
+        //TODO: Add rest of ranges
+        List<LikeValue> likeList = new ArrayList<>(rest.length + 1);
+        likeList.add(new LikeValue((Slice) first));
+        for (Object like : rest) {
+            likeList.add(new LikeValue((Slice) like));
+        }
+        return copyOf(type, likeList);
+    }
+
+    static LikeValueSet of(Type type, LikeValue first, LikeValue... rest) {
+        //TODO: Add rest of ranges
+        List<LikeValue> likeList = new ArrayList<>(rest.length + 1);
+        likeList.add(first);
+        likeList.addAll(Arrays.asList(rest));
+        return copyOf(type, likeList);
+    }
+
+    @JsonCreator
+    public static LikeValueSet copyOf(
+            @JsonProperty("type") Type type,
+            @JsonProperty("likes") List<LikeValue> likes)
+    {
+        return new LikeValueSet(likes);
     }
 
     @Override
@@ -33,19 +76,20 @@ public class LikeValueSet
     @Override
     public boolean isAll()
     {
-        return value.toStringUtf8().equals("%");
+        //TODO:
+        return getLikeValues().getLikeValues().stream().allMatch(x -> x.pattern.toStringUtf8().equals("%"));
     }
 
     @Override
     public boolean isSingleValue()
     {
-        return value.length() != 0;
+        return likes.isEmpty();
     }
 
     @Override
     public Object getSingleValue()
     {
-        return value;
+        return likes.get(0);
     }
 
     @Override
@@ -55,8 +99,20 @@ public class LikeValueSet
     }
 
     @Override
-    public LikeValue getLikeValue() {
-        return () -> value;
+    public LikeValues getLikeValues() {
+        return new LikeValues() {
+            @Override
+            public int getLikeCount()
+            {
+                return LikeValueSet.this.likes.size();
+            }
+
+            @Override
+            public List<LikeValue> getLikeValues()
+            {
+                return LikeValueSet.this.likes;
+            }
+        };
     }
 
     @Override
@@ -64,15 +120,15 @@ public class LikeValueSet
     {
         return new ValuesProcessor() {
             @Override
-            public <T> T transform(Function<Ranges, T> rangesFunction, Function<DiscreteValues, T> discreteValuesFunction, Function<AllOrNone, T> allOrNoneFunction, Function<LikeValue, T> likeValueFunction)
+            public <T> T transform(Function<Ranges, T> rangesFunction, Function<DiscreteValues, T> discreteValuesFunction, Function<AllOrNone, T> allOrNoneFunction, Function<LikeValues, T> likeValueFunction)
             {
-                return likeValueFunction.apply(getLikeValue());
+                return likeValueFunction.apply(getLikeValues());
             }
 
             @Override
-            public void consume(Consumer<Ranges> rangesConsumer, Consumer<DiscreteValues> discreteValuesConsumer, Consumer<AllOrNone> allOrNoneConsumer, Consumer<LikeValue> likeValueConsumer)
+            public void consume(Consumer<Ranges> rangesConsumer, Consumer<DiscreteValues> discreteValuesConsumer, Consumer<AllOrNone> allOrNoneConsumer, Consumer<LikeValues> likeValueConsumer)
             {
-                likeValueConsumer.accept(getLikeValue());
+                likeValueConsumer.accept(getLikeValues());
             }
         };
     }
@@ -87,7 +143,7 @@ public class LikeValueSet
             throw new IllegalStateException(String.format("ValueSet is not a SortedRangeSet: %s", other.getClass()));
         }
 //        LikeValueSet otherLike = (LikeValueSet) other;
-        //TODO: Add algorithm of merging likes
+        //TODO: Add algorithm of intersecting likes
 
 
         return this;
@@ -110,6 +166,24 @@ public class LikeValueSet
     @Override
     public String toString(ConnectorSession session)
     {
-        return "[like " + value.toStringUtf8() + "]";
+        return "[likes " + likes.stream().map(
+                y -> y.pattern.toStringUtf8()).collect(Collectors.joining(", ")
+        ) + "]";
+    }
+
+    @Override
+    public boolean equals(Object o)
+    {
+        if (this == o) { return true; }
+        if (o == null || getClass() != o.getClass()) { return false; }
+        LikeValueSet that = (LikeValueSet) o;
+        return Objects.equals(likes, that.likes);
+    }
+
+    @Override
+    public int hashCode()
+    {
+
+        return Objects.hash(likes);
     }
 }

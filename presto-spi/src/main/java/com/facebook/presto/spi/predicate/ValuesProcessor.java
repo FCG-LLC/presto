@@ -18,7 +18,7 @@ import java.util.function.Function;
 
 public interface ValuesProcessor
 {
-    <T> T transform(Function<Ranges, T> rangesFunction, Function<DiscreteValues, T> discreteValuesFunction, Function<AllOrNone, T> allOrNoneFunction, Function<LikeValue, T> likeValueFunction);
+    <T> T transform(Function<Ranges, T> rangesFunction, Function<DiscreteValues, T> discreteValuesFunction, Function<AllOrNone, T> allOrNoneFunction, Function<LikeValues, T> likeValueFunction);
 
-    void consume(Consumer<Ranges> rangesConsumer, Consumer<DiscreteValues> discreteValuesConsumer, Consumer<AllOrNone> allOrNoneConsumer, Consumer<LikeValue> likeValueConsumer);
+    void consume(Consumer<Ranges> rangesConsumer, Consumer<DiscreteValues> discreteValuesConsumer, Consumer<AllOrNone> allOrNoneConsumer, Consumer<LikeValues> likeValueConsumer);
 }

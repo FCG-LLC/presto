@@ -213,7 +213,7 @@ public final class PreparedStatementBuilder
                     throw new IllegalStateException("Case should not be reachable");
                 },
 
-                likeValue -> columnName + " LIKE " + likeValue.getLikeValue().toStringUtf8());
+                likeValue -> columnName + " LIKE " + likeValue.getLikeValues().get(0).getPattern().toStringUtf8());
     }
 
     private static Object getBindValue(int columnIndex, Set<Integer> uuidColumnIndexes, Object value)

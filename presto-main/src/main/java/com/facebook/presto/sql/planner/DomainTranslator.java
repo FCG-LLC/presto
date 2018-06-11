@@ -19,7 +19,7 @@ import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.predicate.DiscreteValues;
 import com.facebook.presto.spi.predicate.Domain;
-import com.facebook.presto.spi.predicate.LikeValue;
+import com.facebook.presto.spi.predicate.LikeValues;
 import com.facebook.presto.spi.predicate.Marker;
 import com.facebook.presto.spi.predicate.NullableValue;
 import com.facebook.presto.spi.predicate.Range;
@@ -197,7 +197,7 @@ public final class DomainTranslator
         return combineConjuncts(processRange(type, range, reference), excludedPointsExpression);
     }
 
-    private List<Expression> extractDisjuncts(Type type, LikeValue like, SymbolReference reference)
+    private List<Expression> extractDisjuncts(Type type, LikeValues like, SymbolReference reference)
     {
         List<Expression> disjuncts = new ArrayList<>();
         disjuncts.add(literalEncoder.toExpression(like, type));
@@ -785,9 +785,17 @@ public final class DomainTranslator
             // we are leaving also like predicate to know that it was
             // a like predicate and not just string-equal filter
             LikePredicate likePredicate = new LikePredicate(node.getValue(), node.getPattern(), node.getEscape());
+//            TupleDomain<Symbol> tupleDomain = TupleDomain.withColumnDomains(
+//                    ImmutableMap.of(Symbol.from(node.getValue()), Domain.singleValue(VarcharType.createUnboundedVarcharType(), ((StringLiteral) node.getPattern()).getSlice())));
+            TupleDomain<Symbol> tupleDomain = TupleDomain.withColumnDomains(
+                    ImmutableMap.of(
+                            Symbol.from(node.getValue()),
+//                            Domain.singleValue(VarcharType.createUnboundedVarcharType(), ((StringLiteral) node.getPattern()).getSlice())
+                            Domain.singleValue(VarcharType.createUnboundedVarcharType(), ((StringLiteral) node.getPattern()).getSlice())
+                    )
+            );
             return new ExtractionResult(
-                    TupleDomain.withColumnDomains(
-                        ImmutableMap.of(Symbol.from(node.getValue()), Domain.singleValue(VarcharType.createUnboundedVarcharType(), ((StringLiteral) node.getPattern()).getSlice()))),
+                    tupleDomain,
                     complementIfNecessary(likePredicate, complement));
         }
     }

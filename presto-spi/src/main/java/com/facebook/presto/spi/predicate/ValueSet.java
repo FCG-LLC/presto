@@ -15,6 +15,7 @@ package com.facebook.presto.spi.predicate;
 
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spi.type.VarcharType;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
@@ -57,6 +58,10 @@ public interface ValueSet
 
     static ValueSet of(Type type, Object first, Object... rest)
     {
+        //TODO: string -> like
+        if (type.equals(VarcharType.createUnboundedVarcharType())) {
+            return LikeValueSet.of(type, first, rest);
+        }
         if (type.isOrderable()) {
             return SortedRangeSet.of(type, first, rest);
         }
@@ -120,7 +125,7 @@ public interface ValueSet
     /**
      * @return like predicate for likeable strings
      */
-    default LikeValue getLikeValue() {
+    default LikeValues getLikeValues() {
         throw new UnsupportedOperationException();
     }
 

@@ -1354,7 +1354,7 @@ public class PlanPrinter
                         }
                     },
                     likeValue -> parts.add(
-                            "like " + likeValue.getLikeValue().toStringUtf8()));
+                            "like " + likeValue.getLikeValues().get(0).getPattern().toStringUtf8()));
 
             return "[" + Joiner.on(", ").join(parts.build()) + "]";
         }

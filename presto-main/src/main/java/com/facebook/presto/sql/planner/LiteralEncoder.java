@@ -19,7 +19,7 @@ import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.operator.scalar.VarbinaryFunctions;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
-import com.facebook.presto.spi.predicate.LikeValue;
+import com.facebook.presto.spi.predicate.LikeValues;
 import com.facebook.presto.spi.type.CharType;
 import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.Decimals;
@@ -112,6 +112,19 @@ public final class LiteralEncoder
             return new LongLiteral(object.toString());
         }
 
+        if (type instanceof VarcharType) {
+            if (object instanceof LikeValues) {
+                VarcharType varcharType = (VarcharType) type;
+                Slice value = ((LikeValues) object).getLikeValues().get(0).getPattern();
+                StringLiteral stringLiteral = new StringLiteral(value.toStringUtf8());
+
+                if (!varcharType.isUnbounded() && varcharType.getLengthSafe() == SliceUtf8.countCodePoints(value)) {
+                    return stringLiteral;
+                }
+                return new Cast(stringLiteral, type.getDisplayName(), false, true);
+            }
+        }
+
         checkArgument(Primitives.wrap(type.getJavaType()).isInstance(object), "object.getClass (%s) and type.getJavaType (%s) do not agree", object.getClass(), type.getJavaType());
 
         if (type.equals(DOUBLE)) {
@@ -158,9 +171,6 @@ public final class LiteralEncoder
         }
 
         if (type instanceof VarcharType) {
-            if (object instanceof LikeValue) {
-                Slice value = ((LikeValue) object).getLikeValue();
-            }
             VarcharType varcharType = (VarcharType) type;
             Slice value = (Slice) object;
             StringLiteral stringLiteral = new StringLiteral(value.toStringUtf8());

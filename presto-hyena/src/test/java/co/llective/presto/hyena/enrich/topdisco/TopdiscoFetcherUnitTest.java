@@ -9,7 +9,6 @@ import java.sql.SQLException;
 import java.util.Collections;
 import java.util.HashSet;
 
-import static com.facebook.presto.testing.assertions.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.same;
@@ -21,6 +20,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 public class TopdiscoFetcherUnitTest
 {
