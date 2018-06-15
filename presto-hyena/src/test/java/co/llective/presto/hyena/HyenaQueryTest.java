@@ -67,8 +67,14 @@ public class HyenaQueryTest extends PowerMockTestCase
     }
 
     @Test
-    public void testQuery()
+    public void testAndQuery()
     {
-        this.runner.execute("SELECT * from hyena.cs");
+        this.runner.execute("SELECT * from hyena.cs WHERE col1 IN (1,2,3) AND col2 > 5");
+    }
+
+    @Test
+    public void testOrQuery()
+    {
+        this.runner.execute("SELECT * from hyena.cs WHERE col1 IN (1,2,3) OR col2 > 5");
     }
 }
