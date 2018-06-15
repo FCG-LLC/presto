@@ -31,7 +31,12 @@ public class NativeHyenaSession
 
     public NativeHyenaSession(HyenaConfig config)
     {
-        hyenaApi = new HyenaApi(config.getHyenaHost());
+        if (config == null) {
+            // Oops!
+            hyenaApi = null;
+        } else {
+            hyenaApi = new HyenaApi(config.getHyenaHost());
+        }
     }
 
     @Override

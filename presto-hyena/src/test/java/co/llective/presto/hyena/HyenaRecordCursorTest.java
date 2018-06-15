@@ -116,6 +116,7 @@ public class HyenaRecordCursorTest
             assertEquals(denseSize, cursor.getRowCount(scanResult));
         }
 
+
         private HyenaRecordCursor initHyenaRecordCursor()
         {
             HyenaSession hyenaSession = mock(HyenaSession.class);
