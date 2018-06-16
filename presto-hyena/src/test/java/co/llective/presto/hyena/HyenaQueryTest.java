@@ -35,7 +35,8 @@ public class HyenaQueryTest extends PowerMockTestCase
         columns = Arrays.asList(
                 new Column(BlockType.I64Dense, 0, "ts"),
                 new Column(BlockType.I32Dense, 1, "col1"),
-                new Column(BlockType.I32Sparse, 2, "col2")
+                new Column(BlockType.I32Sparse, 2, "col2"),
+                new Column(BlockType.StringBloomDense, 3, "strcol")
         );
         partitions = Arrays.asList(new PartitionInfo(0, 999999999, UUID.randomUUID(), "foobar"));
         return new Catalog(columns, partitions);
@@ -58,7 +59,6 @@ public class HyenaQueryTest extends PowerMockTestCase
          prestoSession = Session.builder(new SessionPropertyManager())
                  .setQueryId(new QueryId("test"))
                  .setIdentity(new Identity("foo", Optional.empty()))
-//                 .setSchema(HyenaMetadata.PRESTO_HYENA_SCHEMA)
                  .setCatalog(HyenaMetadata.PRESTO_HYENA_SCHEMA)
                  .build();
 
@@ -66,15 +66,28 @@ public class HyenaQueryTest extends PowerMockTestCase
         runner.createCatalog(HyenaMetadata.PRESTO_HYENA_SCHEMA, new HyenaConnectorFactory(), new HashMap<>());
     }
 
-    @Test
-    public void testAndQuery()
-    {
-        this.runner.execute("SELECT * from hyena.cs WHERE col1 IN (1,2,3) AND col2 > 5");
-    }
+//    @Test
+//    public void testAndQuery()
+//    {
+//        this.runner.execute("SELECT * from hyena.cs WHERE col1 IN (1,2,3) AND col2 > 5");
+//    }
+
+//    @Test
+//    public void testOrQuery()
+//    {
+//        this.runner.execute("SELECT * from hyena.cs WHERE col1 IN (1,2,3) OR col2 > 5");
+//    }
 
     @Test
-    public void testOrQuery()
+    public void testStringOrQuery()
     {
-        this.runner.execute("SELECT * from hyena.cs WHERE col1 IN (1,2,3) OR col2 > 5");
+        this.runner.execute("SELECT * from hyena.cs WHERE col1 IN (1,2,3) AND (strcol = '%foobar%' OR strcol = '*m*o*r*e')");
     }
+
+//    @Test
+//    public void testOrWithInequalityQuery()
+//    {
+//        this.runner.execute("SELECT * from hyena.cs WHERE col1 IN (1,2,3) AND (col2 = 1OR col2 > 5)");
+//    }
+
 }
