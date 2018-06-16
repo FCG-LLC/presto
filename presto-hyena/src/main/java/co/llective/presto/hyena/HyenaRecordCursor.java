@@ -25,7 +25,6 @@ import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.Type;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Joiner;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import org.apache.commons.lang3.NotImplementedException;
@@ -39,7 +38,6 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 public class HyenaRecordCursor
@@ -199,7 +197,7 @@ public class HyenaRecordCursor
     public boolean advanceNextPosition()
     {
         if (rowPosition == -1) {
-            iteratingStart = System.currentTimeMillis();
+            iteratingStart = System.nanoTime();
         }
         return ++rowPosition < rowCount;
     }
@@ -263,27 +261,15 @@ public class HyenaRecordCursor
         return column;
     }
 
-    private void checkFieldType(int field, Type... expected)
-    {
-        Type actual = getType(field);
-        for (Type type : expected) {
-            if (actual.equals(type)) {
-                return;
-            }
-        }
-        String expectedTypes = Joiner.on(", ").join(expected);
-        throw new IllegalArgumentException(format("Expected field %s to be type %s but is %s", field, expectedTypes, actual));
-    }
-
     @Override
     public void close()
     {
         long closeTime = System.currentTimeMillis();
-        long iteratingTime = (closeTime - iteratingStart);
+        long iteratingTime = (System.nanoTime() - iteratingStart);
         log.warn("Scan + deserialization time: " + (scanFinish - scanStart) + "ms");
         log.warn("Constructor time: " + (constructorFinish - constructorStart) + "ms");
-        log.warn("Iterating time: " + (closeTime - iteratingStart) + "ms");
-        log.warn("Iterated through " + rowPosition + " rows, " + (rowPosition == 0 ? 0 : (iteratingTime / rowPosition)) + "ms per row");
+        log.warn("Iterating time: " + (iteratingTime / 1000000) + "ms");
+        log.warn("Iterated through " + rowPosition + " rows, " + (rowPosition == 0 ? 0 : (iteratingTime / rowPosition)) + "ns per row");
         log.warn("Whole cursor job: " + (closeTime - constructorStart) + "ms");
         //TODO: cancel query in hyenaAPI (send abort request with requestID)
     }
