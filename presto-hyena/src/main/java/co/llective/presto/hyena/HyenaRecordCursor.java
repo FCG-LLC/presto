@@ -30,6 +30,7 @@ import io.airlift.slice.Slice;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -52,11 +53,11 @@ public class HyenaRecordCursor
 
     private Map<Integer, ColumnValues> fieldsToColumns = new HashMap<>();
 
-    private long constructorStart;
-    private long constructorFinish;
+    private long constructorStartMs;
+    private long constructorFinishMs;
     private long scanStart;
     private long scanFinish;
-    private long iteratingStart;
+    private long iteratingStartNs;
 
     public HyenaRecordCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
     {
@@ -65,17 +66,24 @@ public class HyenaRecordCursor
 
     public HyenaRecordCursor(HyenaPredicatesUtil predicateHandler, HyenaSession hyenaSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
     {
-        constructorStart = System.currentTimeMillis();
+        constructorStartMs = System.currentTimeMillis();
         this.columns = requireNonNull(columns, "columns is null");
 
         ScanRequest req = new ScanRequest();
-        req.setMinTs(0);
-        req.setMaxTs(Long.MAX_VALUE);
         req.setProjection(new ArrayList<>());
         req.setFilters(new ScanOrFilters());
 
         for (HyenaColumnHandle col : columns) {
             req.getProjection().add(col.getOrdinalPosition());
+        }
+
+        Optional<AbstractMap.SimpleEntry<Long, Long>> tsBoundaries = predicateHandler.getTsConstraints(predicate);
+        if (tsBoundaries.isPresent()) {
+            req.setMinTs(tsBoundaries.get().getKey());
+            req.setMaxTs(tsBoundaries.get().getValue());
+        } else {
+            req.setMinTs(0L);
+            req.setMaxTs(Long.MAX_VALUE);
         }
 
         ScanOrFilters filters = predicateHandler.predicateToFilters(predicate);
@@ -93,7 +101,7 @@ public class HyenaRecordCursor
         prepareSliceMappings();
 
         log.info("Received " + rowCount + " records");
-        constructorFinish = System.currentTimeMillis();
+        constructorFinishMs = System.currentTimeMillis();
     }
 
     private void prepareSliceMappings()
@@ -197,7 +205,7 @@ public class HyenaRecordCursor
     public boolean advanceNextPosition()
     {
         if (rowPosition == -1) {
-            iteratingStart = System.nanoTime();
+            iteratingStartNs = System.nanoTime();
         }
         return ++rowPosition < rowCount;
     }
@@ -264,13 +272,13 @@ public class HyenaRecordCursor
     @Override
     public void close()
     {
-        long closeTime = System.currentTimeMillis();
-        long iteratingTime = (System.nanoTime() - iteratingStart);
+        long closeTimeMs = System.currentTimeMillis();
+        long iteratingTimeNs = (System.nanoTime() - iteratingStartNs);
         log.warn("Scan + deserialization time: " + (scanFinish - scanStart) + "ms");
-        log.warn("Constructor time: " + (constructorFinish - constructorStart) + "ms");
-        log.warn("Iterating time: " + (iteratingTime / 1000000) + "ms");
-        log.warn("Iterated through " + rowPosition + " rows, " + (rowPosition == 0 ? 0 : (iteratingTime / rowPosition)) + "ns per row");
-        log.warn("Whole cursor job: " + (closeTime - constructorStart) + "ms");
+        log.warn("Constructor time: " + (constructorFinishMs - constructorStartMs) + "ms");
+        log.warn("Iterating time: " + (iteratingTimeNs / 1000000) + "ms");
+        log.warn("Iterated through " + rowPosition + " rows, " + (rowPosition == 0 ? 0 : (iteratingTimeNs / rowPosition)) + "ns per row");
+        log.warn("Whole cursor job: " + (closeTimeMs - constructorStartMs) + "ms");
         //TODO: cancel query in hyenaAPI (send abort request with requestID)
     }
 }
