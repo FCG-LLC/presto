@@ -81,7 +81,8 @@ public class HyenaRecordCursor
         if (tsBoundaries.isPresent()) {
             req.setMinTs(tsBoundaries.get().getKey());
             req.setMaxTs(tsBoundaries.get().getValue());
-        } else {
+        }
+        else {
             req.setMinTs(0L);
             req.setMaxTs(Long.MAX_VALUE);
         }
@@ -226,7 +227,7 @@ public class HyenaRecordCursor
 
         ColumnValues column = getColumn(field);
 
-        switch(column.getType()) {
+        switch (column.getType()) {
             case I128Dense:
             case U128Dense:
             case StringDense:

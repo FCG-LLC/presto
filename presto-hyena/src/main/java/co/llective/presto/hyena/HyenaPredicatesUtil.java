@@ -22,16 +22,16 @@ import co.llective.presto.hyena.types.U64Type;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.predicate.Marker;
 import com.facebook.presto.spi.predicate.Range;
-import com.facebook.presto.spi.predicate.Ranges;
 import com.facebook.presto.spi.predicate.TupleDomain;
+import com.google.common.collect.Lists;
 import com.google.common.primitives.UnsignedLong;
 import io.airlift.slice.Slice;
-import org.apache.commons.lang3.NotImplementedException;
 
 import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 
@@ -81,62 +81,127 @@ public class HyenaPredicatesUtil
         return Optional.empty();
     }
 
+    /**
+     * Method that transforms given {@link TupleDomain} into {@link ScanOrFilters}
+     * Example:
+     * input:
+     * col1 - range11, range12
+     * col2 - range21, range22
+     *
+     * output:
+     * (range11 AND range21) OR
+     * (range11 AND range22) OR
+     * (range12 AND range21) OR
+     * (range12 AND range22)
+     *
+     * @param predicate {@link TupleDomain}
+     * @return {@link ScanOrFilters}
+     */
     public ScanOrFilters predicateToFilters(TupleDomain<HyenaColumnHandle> predicate)
     {
-        ScanOrFilters filters = new ScanOrFilters();
-        //no predicates, no filters, no problem
-        if (!predicate.getDomains().isPresent()) {
-            return filters;
+        ScanOrFilters orFilters = new ScanOrFilters();
+
+        if (predicate.getDomains().isPresent()) {
+            Map<HyenaColumnHandle, Domain> domainMap = predicate.getDomains().get();
+
+            if (domainMap.isEmpty()) {
+                return orFilters;
+            }
+
+            List<List<ColumnRangePair>> allRanges = domainMap.entrySet().stream()
+                    .map(entry -> {
+                        HyenaColumnHandle column = entry.getKey();
+                        List<Range> ranges = entry.getValue().getValues().getRanges().getOrderedRanges();
+                        List<ColumnRangePair> columnRangePairs = ranges.stream()
+                                .map(range -> new ColumnRangePair(column, range))
+                                .collect(Collectors.toList());
+                        return columnRangePairs;
+                    })
+                    .collect(Collectors.toList());
+
+            List<List<ColumnRangePair>> mixedRanges = Lists.cartesianProduct(allRanges);
+
+            for (List<ColumnRangePair> andRanges : mixedRanges) {
+                ScanAndFilters andFilters = new ScanAndFilters();
+
+                for (ColumnRangePair columnRange : andRanges) {
+                    // create filter and add to ANDs
+                    HyenaColumnHandle column = columnRange.getColumn();
+                    Range range = columnRange.getRange();
+
+                    andFilters.addAll(scanAndFiltersFromRange(column, range));
+                }
+
+                // add ANDs to OR
+                orFilters.add(andFilters);
+            }
         }
-
-        Map<HyenaColumnHandle, Domain> domainMap = predicate.getDomains().get();
-
-        domainMap.forEach((column, values) -> values.getValues().getValuesProcessor().consume(
-                ranges -> {
-                    filters.addAll(toOrScanFilters(column, ranges));
-                },
-                discreteValues -> {
-                    throw new NotImplementedException("Discrete values are not handled yet"); },
-                allOrNone -> { /* noop */ }));
-
-        return filters;
+        return orFilters;
     }
 
-    private ScanOrFilters toOrScanFilters(HyenaColumnHandle column, Ranges ranges)
+    private ScanAndFilters scanAndFiltersFromRange(HyenaColumnHandle column, Range range)
     {
-        ScanOrFilters filters = new ScanOrFilters();
-        for (Range range : ranges.getOrderedRanges()) {
-            // handle = situation
-            if (range.isSingleValue()) {
-                //TODO: split string%string case
-                filters.add(createSingleFilter(column, ScanComparison.Eq, range.getSingleValue()));
+        ScanAndFilters andFilters = new ScanAndFilters();
+
+        // handle = situation
+        if (range.isSingleValue()) {
+            //TODO: split string%string case
+            ScanFilter singleFilter = createSingleFilter(column, ScanComparison.Eq, range.getSingleValue());
+            andFilters.add(singleFilter);
+        }
+        else {
+            Marker high = range.getHigh();
+            Marker low = range.getLow();
+
+            if (low.getValueBlock().isPresent() && high.getValueBlock().isPresent()) {
+                // handle BETWEEN case
+                andFilters.add(createLowScanFilter(column, low));
+                andFilters.add(createHighScanFilter(column, high));
             }
-            else {
-                Marker high = range.getHigh();
-                Marker low = range.getLow();
-
-                if (low.getValueBlock().isPresent() && high.getValueBlock().isPresent()) {
-                    // handle BETWEEN case
-                    ScanAndFilters scanAndFilters = new ScanAndFilters();
-
-                    scanAndFilters.add(createLowScanFilter(column, low));
-                    scanAndFilters.add(createHighScanFilter(column, high));
-
-                    filters.add(scanAndFilters);
-                }
-                else if (low.getValueBlock().isPresent()) {
-                    // handle > or >= situation
-                    ScanAndFilters filter = new ScanAndFilters(createLowScanFilter(column, low));
-                    filters.add(filter);
-                }
-                else if (high.getValueBlock().isPresent()) {
-                    // handle < or <= situation
-                    ScanAndFilters filter = new ScanAndFilters(createHighScanFilter(column, high));
-                    filters.add(filter);
-                }
+            else if (low.getValueBlock().isPresent()) {
+                // handle > or >= situation
+                ScanFilter greaterFilter = createLowScanFilter(column, low);
+                andFilters.add(greaterFilter);
+            }
+            else if (high.getValueBlock().isPresent()) {
+                // handle < or <= situation
+                ScanFilter lessFilter = createHighScanFilter(column, high);
+                andFilters.add(lessFilter);
             }
         }
-        return filters;
+
+        return andFilters;
+    }
+
+    private class ColumnRangePair
+    {
+        private HyenaColumnHandle column;
+        private Range range;
+
+        public HyenaColumnHandle getColumn()
+        {
+            return column;
+        }
+
+        public Range getRange()
+        {
+            return range;
+        }
+
+        ColumnRangePair(HyenaColumnHandle column, Range range)
+        {
+            this.column = column;
+            this.range = range;
+        }
+
+        @Override
+        public String toString()
+        {
+            return "ColumnRangePair{" +
+                    "column=" + column +
+                    ", range=(" + range.getLow().getValue() + ", " + range.getHigh().getValue() +
+                    ")}";
+        }
     }
 
     private ScanFilter createHighScanFilter(HyenaColumnHandle column, Marker high)
@@ -208,17 +273,15 @@ public class HyenaPredicatesUtil
         }
     }
 
-    private ScanAndFilters createSingleFilter(HyenaColumnHandle column, ScanComparison comparisonOperator, Object singleValue)
+    private ScanFilter createSingleFilter(HyenaColumnHandle column, ScanComparison comparisonOperator, Object singleValue)
     {
-        ScanAndFilters andFilters = new ScanAndFilters();
         if (column.getColumnType() == VARCHAR) {
-            andFilters.add(getNewScanFilter(column, ScanComparison.Contains, singleValue));
+            return getNewScanFilter(column, ScanComparison.Contains, singleValue);
         }
         else {
             Long val = (Long) singleValue;
-            andFilters.add(getNewScanFilter(column, comparisonOperator, val));
+            return getNewScanFilter(column, comparisonOperator, val);
         }
-        return andFilters;
     }
 
     private ScanFilter getNewScanFilter(HyenaColumnHandle column, ScanComparison op, Object value)
@@ -228,10 +291,10 @@ public class HyenaPredicatesUtil
             return createStringFilter(column, op, slice.toStringUtf8());
         }
         return new ScanFilter(
-            column.getOrdinalPosition(),
-            op,
-            column.getHyenaType().mapToFilterType(),
-            value);
+                column.getOrdinalPosition(),
+                op,
+                column.getHyenaType().mapToFilterType(),
+                value);
     }
 
     private ScanFilter createStringFilter(HyenaColumnHandle column, ScanComparison op, String value)
