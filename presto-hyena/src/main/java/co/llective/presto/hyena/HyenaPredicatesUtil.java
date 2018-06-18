@@ -28,7 +28,10 @@ import com.google.common.primitives.UnsignedLong;
 import io.airlift.slice.Slice;
 import org.apache.commons.lang3.NotImplementedException;
 
+import java.util.AbstractMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 
@@ -36,6 +39,47 @@ public class HyenaPredicatesUtil
 {
     public HyenaPredicatesUtil()
     {}
+
+    public Optional<AbstractMap.SimpleEntry<Long, Long>> getTsConstraints(TupleDomain<HyenaColumnHandle> predicate)
+    {
+        if (predicate.getColumnDomains().isPresent()) {
+            List<TupleDomain.ColumnDomain<HyenaColumnHandle>> columnDomains = predicate.getColumnDomains().get();
+            Optional<Domain> tsDomain = columnDomains.stream().filter(x -> x.getColumn().getColumnName().equals("timestamp")).map(TupleDomain.ColumnDomain::getDomain).findFirst();
+            if (tsDomain.isPresent()) {
+                Long lowestValue = Long.MAX_VALUE;
+                Long highestValue = Long.MIN_VALUE;
+                Domain domain = tsDomain.get();
+                if (domain.isSingleValue()) {
+                    Long ts = (Long) domain.getSingleValue();
+                    lowestValue = ts;
+                    highestValue = ts;
+                }
+                else {
+                    for (Range range : domain.getValues().getRanges().getOrderedRanges()) {
+                        Marker high = range.getHigh();
+                        Marker low = range.getLow();
+
+                        if (low.getValueBlock().isPresent()) {
+                            // handle > or >= situation
+                            Long lowValue = (Long) low.getValue();
+                            if (lowValue < lowestValue) {
+                                lowestValue = lowValue;
+                            }
+                        }
+                        if (high.getValueBlock().isPresent()) {
+                            // handle < or <= situation
+                            Long maxValue = (Long) high.getValue();
+                            if (maxValue > highestValue) {
+                                highestValue = maxValue;
+                            }
+                        }
+                    }
+                }
+                return Optional.of(new AbstractMap.SimpleEntry<>(lowestValue, highestValue));
+            }
+        }
+        return Optional.empty();
+    }
 
     public ScanOrFilters predicateToFilters(TupleDomain<HyenaColumnHandle> predicate)
     {
@@ -64,6 +108,7 @@ public class HyenaPredicatesUtil
         for (Range range : ranges.getOrderedRanges()) {
             // handle = situation
             if (range.isSingleValue()) {
+                //TODO: split string%string case
                 filters.add(createSingleFilter(column, ScanComparison.Eq, range.getSingleValue()));
             }
             else {
@@ -199,6 +244,9 @@ public class HyenaPredicatesUtil
         }
         else if (value.endsWith("%")) {
             op = ScanComparison.StartsWith;
+        }
+        else {
+            op = ScanComparison.Matches;
         }
 
         return new ScanFilter(
