@@ -90,7 +90,6 @@ public class HyenaTables
             case U64Sparse:
                 return U64Type.U_64_TYPE;
             case StringDense:
-            case StringBloomDense:
                 return VARCHAR;
             default:
                 throw new RuntimeException("I don't know how to handle " + blockType.toString());

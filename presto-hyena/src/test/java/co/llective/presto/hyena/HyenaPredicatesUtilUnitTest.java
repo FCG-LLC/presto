@@ -175,7 +175,7 @@ public class HyenaPredicatesUtilUnitTest
                     new HyenaColumnHandle(
                             "column2",
                             VarcharType.VARCHAR,
-                            BlockType.StringBloomDense,
+                            BlockType.StringDense,
                             1),
                     Domain.singleValue(VarcharType.VARCHAR, Slices.utf8Slice("value")));
             TupleDomain<HyenaColumnHandle> tupleDomain = TupleDomain.withColumnDomains(domainMap);
@@ -206,7 +206,7 @@ public class HyenaPredicatesUtilUnitTest
             HyenaColumnHandle column2 = new HyenaColumnHandle(
                     "column2",
                     VarcharType.VARCHAR,
-                    BlockType.StringBloomDense,
+                    BlockType.StringDense,
                     1);
             Range range1 = Range.range(U64Type.U_64_TYPE, 10L, true, 20L, true);
             Range range2 = Range.equal(U64Type.U_64_TYPE, 1L);
@@ -271,7 +271,7 @@ public class HyenaPredicatesUtilUnitTest
                     new HyenaColumnHandle(
                             "column",
                             VarcharType.VARCHAR,
-                            BlockType.StringBloomDense,
+                            BlockType.StringDense,
                             0),
                     Domain.singleValue(VarcharType.VARCHAR, Slices.utf8Slice("%asd%")));
             TupleDomain<HyenaColumnHandle> tupleDomain = TupleDomain.withColumnDomains(domainMap);
@@ -293,7 +293,7 @@ public class HyenaPredicatesUtilUnitTest
                     new HyenaColumnHandle(
                             "column",
                             VarcharType.VARCHAR,
-                            BlockType.StringBloomDense,
+                            BlockType.StringDense,
                             0),
                     Domain.singleValue(VarcharType.VARCHAR, Slices.utf8Slice("%asd")));
             TupleDomain<HyenaColumnHandle> tupleDomain = TupleDomain.withColumnDomains(domainMap);
@@ -315,7 +315,7 @@ public class HyenaPredicatesUtilUnitTest
                     new HyenaColumnHandle(
                             "column",
                             VarcharType.VARCHAR,
-                            BlockType.StringBloomDense,
+                            BlockType.StringDense,
                             0),
                     Domain.singleValue(VarcharType.VARCHAR, Slices.utf8Slice("asd%")));
             TupleDomain<HyenaColumnHandle> tupleDomain = TupleDomain.withColumnDomains(domainMap);
@@ -337,7 +337,7 @@ public class HyenaPredicatesUtilUnitTest
                     new HyenaColumnHandle(
                             "column",
                             VarcharType.VARCHAR,
-                            BlockType.StringBloomDense,
+                            BlockType.StringDense,
                             0),
                     Domain.singleValue(VarcharType.VARCHAR, Slices.utf8Slice("asd")));
             TupleDomain<HyenaColumnHandle> tupleDomain = TupleDomain.withColumnDomains(domainMap);
