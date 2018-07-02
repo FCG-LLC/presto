@@ -19,8 +19,6 @@ import com.facebook.presto.operator.project.PageFilter;
 import com.facebook.presto.operator.project.PageProcessor;
 import com.facebook.presto.operator.project.PageProjection;
 import com.facebook.presto.spi.PrestoException;
-import com.facebook.presto.spi.type.TypeSignature;
-import com.facebook.presto.sql.relational.CallExpression;
 import com.facebook.presto.sql.relational.RowExpression;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -33,11 +31,9 @@ import org.weakref.jmx.Nested;
 
 import javax.inject.Inject;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static com.facebook.presto.spi.StandardErrorCode.COMPILER_ERROR;
@@ -113,63 +109,12 @@ public class ExpressionCompiler
         return compilePageProcessor(filter, projections, Optional.empty());
     }
 
-    private class RecursiveResult
-    {
-        boolean found;
-        boolean swapped;
-
-        RecursiveResult(boolean found, boolean swapped)
-        {
-            this.found = found;
-            this.swapped = swapped;
-        }
-    }
-
-    private RecursiveResult findRecursively(RowExpression filter, Function<CallExpression, Boolean> childFilter, Optional<RowExpression> newFilter)
-    {
-        if (filter instanceof CallExpression) {
-            CallExpression ce = (CallExpression) filter;
-            if (childFilter.apply(ce)) {
-                return new RecursiveResult(true, false);
-            }
-            ArrayList<RowExpression> mutArguments = new ArrayList<>(ce.getArguments());
-            for (int i = 0; i < ce.getArguments().size(); i++) {
-                RecursiveResult childRecursiveResult = findRecursively(ce.getArguments().get(i), childFilter, newFilter);
-                if (childRecursiveResult.found) {
-                    if (childRecursiveResult.swapped) {
-                        return childRecursiveResult;
-                    }
-                    if (newFilter.isPresent()) {
-                        mutArguments.set(i, newFilter.get());
-
-                        ce.setArguments(mutArguments);
-                        return new RecursiveResult(true, true);
-                    }
-                    return new RecursiveResult(true, false);
-                }
-            }
-        }
-        return new RecursiveResult(false, false);
-    }
-
-    private Optional<RowExpression> removeFakeStringFilter(Optional<RowExpression> filter)
-    {
-        if (filter.isPresent()) {
-            boolean likeFilter = findRecursively(filter.get(), (zxc) -> zxc.getSignature().getName().equals("LIKE"), Optional.empty()).found;
-            boolean equalFilter = findRecursively(filter.get(), (zxc) -> zxc.getSignature().getName().equals("$operator$EQUAL")
-                    && zxc.getSignature().getArgumentTypes().stream().allMatch(arg -> arg.equals(TypeSignature.parseTypeSignature("varchar"))), Optional.empty()).found;
-            if (likeFilter && equalFilter) {
-                findRecursively(filter.get(), (zxc) -> zxc.getSignature().getName().equals("$operator$EQUAL")
-                        && zxc.getSignature().getArgumentTypes().stream().allMatch(arg -> arg.equals(TypeSignature.parseTypeSignature("varchar"))), Optional.of(constant(true, BOOLEAN)));
-            }
-        }
-        return filter;
-    }
-
     private <T> Class<? extends T> compile(Optional<RowExpression> filter, List<RowExpression> projections, BodyCompiler bodyCompiler, Class<? extends T> superType)
     {
+        // remove fake string filters (like push-down hack)
+        LikeHackUtility likeHackUtility = new LikeHackUtility();
+        filter = likeHackUtility.removeFakeStringFilters(filter);
         // create filter and project page iterator class
-        filter = removeFakeStringFilter(filter);
         try {
             return compileProcessor(filter.orElse(constant(true, BOOLEAN)), projections, bodyCompiler, superType);
         }
