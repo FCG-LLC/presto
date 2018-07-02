@@ -13,19 +13,24 @@
  */
 package co.llective.presto.hyena.types;
 
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.function.ScalarOperator;
 import com.facebook.presto.spi.function.SqlType;
 import com.facebook.presto.spi.type.StandardTypes;
 
 import static co.llective.presto.hyena.types.U64Type.U_64_NAME;
 import static co.llective.presto.hyena.types.U64Type.U_64_TYPE;
+import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
 import static com.facebook.presto.spi.function.OperatorType.BETWEEN;
 import static com.facebook.presto.spi.function.OperatorType.CAST;
+import static com.facebook.presto.spi.function.OperatorType.DIVIDE;
 import static com.facebook.presto.spi.function.OperatorType.EQUAL;
 import static com.facebook.presto.spi.function.OperatorType.GREATER_THAN;
 import static com.facebook.presto.spi.function.OperatorType.GREATER_THAN_OR_EQUAL;
 import static com.facebook.presto.spi.function.OperatorType.LESS_THAN;
 import static com.facebook.presto.spi.function.OperatorType.LESS_THAN_OR_EQUAL;
+import static com.facebook.presto.spi.function.OperatorType.MODULUS;
+import static com.facebook.presto.spi.function.OperatorType.MULTIPLY;
 import static com.facebook.presto.spi.function.OperatorType.NOT_EQUAL;
 
 /**
@@ -161,6 +166,42 @@ public class U64BigIntOperators
     {
         return greaterThanOrEqualBigInt(value, min)
                 && lessThanOrEqualBigInt(value, max);
+    }
+
+    @ScalarOperator(MULTIPLY)
+    @SqlType(U_64_NAME)
+    public static long multiply(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.BIGINT) long bigint)
+    {
+        try {
+            return U_64_TYPE.multiplyBySignedLong(u64, bigint);
+        }
+        catch (ArithmeticException exc) {
+            throw new PrestoException(NUMERIC_VALUE_OUT_OF_RANGE, exc.getMessage(), exc);
+        }
+    }
+
+    @ScalarOperator(DIVIDE)
+    @SqlType(U_64_NAME)
+    public static long divide(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.BIGINT) long bigint)
+    {
+        try {
+            return U_64_TYPE.divideBySignedLong(u64, bigint);
+        }
+        catch (ArithmeticException exc) {
+            throw new PrestoException(NUMERIC_VALUE_OUT_OF_RANGE, exc.getMessage(), exc);
+        }
+    }
+
+    @ScalarOperator(MODULUS)
+    @SqlType(U_64_NAME)
+    public static long modulus(@SqlType(U_64_NAME) long u64, @SqlType(StandardTypes.BIGINT) long bigint)
+    {
+        try {
+            return U_64_TYPE.moduloSignedLong(u64, bigint);
+        }
+        catch (ArithmeticException exc) {
+            throw new PrestoException(NUMERIC_VALUE_OUT_OF_RANGE, exc.getMessage(), exc);
+        }
     }
 
     /**
