@@ -68,7 +68,7 @@ public class HyenaRecordCursorTest
             when(connectorSession.getProperty(same(STREAMING_ENABLED), any())).thenReturn(false);
             when(connectorSession.getProperty(same(STREAMING_RECORDS_LIMIT), any())).thenReturn(10L);
             when(connectorSession.getProperty(same(STREAMING_RECORDS_THRESHOLD), any())).thenReturn(10L);
-            cursor = spy(new HyenaRecordCursor(session, connectorSession, Collections.singletonList(column), TupleDomain.all()));
+            cursor = spy(new HyenaRecordCursor(session, connectorSession, Collections.singletonList(column), TupleDomain.all(), Optional.empty()));
             doNothing().when(cursor).prepareSliceMappings();
         }
 
@@ -173,7 +173,7 @@ public class HyenaRecordCursorTest
             when(connectorSession.getProperty(same(STREAMING_ENABLED), any())).thenReturn(false);
             when(connectorSession.getProperty(same(STREAMING_RECORDS_LIMIT), any())).thenReturn(10L);
             when(connectorSession.getProperty(same(STREAMING_RECORDS_THRESHOLD), any())).thenReturn(10L);
-            cursor = spy(new HyenaRecordCursor(session, connectorSession, Collections.singletonList(column), TupleDomain.all()));
+            cursor = spy(new HyenaRecordCursor(session, connectorSession, Collections.singletonList(column), TupleDomain.all(), Optional.empty()));
         }
 
         @Test
@@ -334,7 +334,7 @@ public class HyenaRecordCursorTest
             when(connectorSession.getProperty(same(STREAMING_RECORDS_LIMIT), any())).thenReturn(10L);
             when(connectorSession.getProperty(same(STREAMING_RECORDS_THRESHOLD), any())).thenReturn(10L);
             HyenaColumnHandle handle = new HyenaColumnHandle("", IntegerType.INTEGER, BlockType.I16Sparse, 0);
-            return new HyenaRecordCursor(hyenaSession, connectorSession, Collections.singletonList(handle), TupleDomain.all());
+            return new HyenaRecordCursor(hyenaSession, connectorSession, Collections.singletonList(handle), TupleDomain.all(), Optional.empty());
         }
     }
 }

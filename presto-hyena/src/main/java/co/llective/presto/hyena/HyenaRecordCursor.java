@@ -67,12 +67,12 @@ public class HyenaRecordCursor
     private long constructorFinishMs;
     private long iteratingStartNs;
 
-    public HyenaRecordCursor(HyenaSession hyenaSession, ConnectorSession connectorSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
+    public HyenaRecordCursor(HyenaSession hyenaSession, ConnectorSession connectorSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate, Optional<TimeBoundaries> timeBoundaries)
     {
-        this(new HyenaPredicatesUtil(), hyenaSession, connectorSession, columns, predicate);
+        this(new HyenaPredicatesUtil(), hyenaSession, connectorSession, columns, predicate, timeBoundaries);
     }
 
-    public HyenaRecordCursor(HyenaPredicatesUtil predicateHandler, HyenaSession hyenaSession, ConnectorSession connectorSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
+    public HyenaRecordCursor(HyenaPredicatesUtil predicateHandler, HyenaSession hyenaSession, ConnectorSession connectorSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate, Optional<TimeBoundaries> timeBoundaries)
     {
         constructorStartMs = System.currentTimeMillis();
         this.hyenaSession = hyenaSession;
@@ -81,7 +81,7 @@ public class HyenaRecordCursor
         this.streamingLimit = HyenaConnectorSessionProperties.getStreamingRecordsLimit(connectorSession);
         this.streamingThreshold = HyenaConnectorSessionProperties.getStreamingRecordsThreshold(connectorSession);
 
-        this.scanRequest = buildScanRequest(predicateHandler, columns, predicate);
+        this.scanRequest = buildScanRequest(predicateHandler, columns, predicate, timeBoundaries);
 
         log.info("Filters: " + StringUtils.join(this.scanRequest.getFilters(), ", "));
 
@@ -91,7 +91,7 @@ public class HyenaRecordCursor
         constructorFinishMs = System.currentTimeMillis();
     }
 
-    private ScanRequest buildScanRequest(HyenaPredicatesUtil predicateHandler, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
+    private ScanRequest buildScanRequest(HyenaPredicatesUtil predicateHandler, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate, Optional<TimeBoundaries> timeBoundaries)
     {
         ScanRequest req = new ScanRequest();
         req.setProjection(new ArrayList<>());
@@ -101,10 +101,9 @@ public class HyenaRecordCursor
             req.getProjection().add(col.getOrdinalPosition());
         }
 
-        Optional<TimeBoundaries> tsBoundaries = predicateHandler.getTsConstraints(predicate);
-        if (tsBoundaries.isPresent()) {
-            req.setMinTs(tsBoundaries.get().getStart());
-            req.setMaxTs(tsBoundaries.get().getEnd());
+        if (timeBoundaries.isPresent()) {
+            req.setMinTs(timeBoundaries.get().getStart());
+            req.setMaxTs(timeBoundaries.get().getEnd());
         }
         else {
             req.setMinTs(0L);

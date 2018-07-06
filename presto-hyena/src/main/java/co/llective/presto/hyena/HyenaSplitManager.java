@@ -14,6 +14,7 @@
 package co.llective.presto.hyena;
 
 import co.llective.hyena.api.PartitionInfo;
+import co.llective.presto.hyena.util.TimeBoundaries;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.ConnectorSplitSource;
@@ -35,6 +36,8 @@ import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
@@ -119,6 +122,8 @@ public class HyenaSplitManager
         return true;
     }
 
+    private static final int CHUNKS_NO = 5;
+
     @Override
     public ConnectorSplitSource getSplits(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorTableLayoutHandle layout, SplitSchedulingStrategy splitSchedulingStrategy)
     {
@@ -129,10 +134,37 @@ public class HyenaSplitManager
 
         Node currentNode = nodeManager.getCurrentNode();
 
+        HyenaPredicatesUtil predicatesUtil = new HyenaPredicatesUtil();
+        Optional<TimeBoundaries> timeRange = predicatesUtil.getTsConstraints(effectivePredicate);
+        if (timeRange.isPresent()) {
+            List<TimeBoundaries> splitBoundaries = getTimeBoundaries(timeRange.get());
+            List<HyenaSplit> splits = splitBoundaries.stream()
+                        .map(timeBoundaries -> new HyenaSplit(currentNode.getHostAndPort(), effectivePredicate, Optional.of(timeBoundaries)))
+                        .collect(Collectors.toList());
+
+            return new FixedSplitSource(splits);
+        }
+
         //TODO: Right now it's single split which causes all resulting data (after pushed-down filters) land in RAM.
         //TODO: We need to create splits based on source and multiple time ranges.
-        List<ConnectorSplit> splits = Collections.singletonList(new HyenaSplit(currentNode.getHostAndPort(), effectivePredicate));
+        List<ConnectorSplit> splits = Collections.singletonList(new HyenaSplit(currentNode.getHostAndPort(), effectivePredicate, Optional.empty()));
 
         return new FixedSplitSource(splits);
+    }
+
+    private List<TimeBoundaries> getTimeBoundaries(TimeBoundaries timeRange)
+    {
+        long min = timeRange.getStart();
+        long max = timeRange.getEnd();
+        long offset = (max - min) / CHUNKS_NO;
+
+        List<TimeBoundaries> splitBoundaries = new ArrayList<>(CHUNKS_NO);
+        for (int i = 0; i < CHUNKS_NO - 1; i++) {
+            TimeBoundaries splitTimeBoundaries = TimeBoundaries.of(min + i * offset, min + (i + 1) * offset);
+            splitBoundaries.add(splitTimeBoundaries);
+        }
+        // in case of some modulo left
+        splitBoundaries.add(TimeBoundaries.of(min + (CHUNKS_NO - 1) * offset, max));
+        return splitBoundaries;
     }
 }
