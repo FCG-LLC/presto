@@ -120,6 +120,8 @@ public class HyenaRecordCursor
         else {
             req.setScanConfig(Optional.empty());
         }
+        log.info("Time constraints:\t" + req.getMinTs() + " -\t" + req.getMaxTs());
+        log.info("Filters: " + StringUtils.join(req.getFilters(), ", "));
 
         return req;
     }
