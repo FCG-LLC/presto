@@ -28,6 +28,7 @@ import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.primitives.UnsignedLong;
 import io.airlift.log.Logger;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -37,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
@@ -123,6 +125,7 @@ public class HyenaSplitManager
     }
 
     private static final int CHUNKS_NO = 5;
+    private static final long CHUNK_WIDTH_US = TimeUnit.HOURS.toMicros(1);
 
     @Override
     public ConnectorSplitSource getSplits(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorTableLayoutHandle layout, SplitSchedulingStrategy splitSchedulingStrategy)
@@ -137,7 +140,7 @@ public class HyenaSplitManager
         HyenaPredicatesUtil predicatesUtil = new HyenaPredicatesUtil();
         Optional<TimeBoundaries> timeRange = predicatesUtil.getTsConstraints(effectivePredicate);
         if (timeRange.isPresent()) {
-            List<TimeBoundaries> splitBoundaries = getTimeBoundaries(timeRange.get());
+            List<TimeBoundaries> splitBoundaries = splitTimeBoundaries2(timeRange.get());
             List<HyenaSplit> splits = splitBoundaries.stream()
                         .map(timeBoundaries -> new HyenaSplit(currentNode.getHostAndPort(), effectivePredicate, Optional.of(timeBoundaries)))
                         .collect(Collectors.toList());
@@ -152,10 +155,40 @@ public class HyenaSplitManager
         return new FixedSplitSource(splits);
     }
 
-    private List<TimeBoundaries> getTimeBoundaries(TimeBoundaries timeRange)
+    private List<TimeBoundaries> splitTimeBoundaries2(TimeBoundaries timeRange)
     {
-        long min = timeRange.getStart();
-        long max = timeRange.getEnd();
+        Long min = timeRange.getStart();
+        Long max = timeRange.getEnd();
+
+        List<TimeBoundaries> splitBoundaries = new ArrayList<>();
+
+        if (min == null) {
+            // -inf
+            //TODO: change to min value of record in DB
+            min = 1531138692090000L;
+            splitBoundaries.add(TimeBoundaries.of(0L, min));
+        }
+        if (max == null) {
+            max = (System.currentTimeMillis() + TimeUnit.MINUTES.toNanos(10)) * 1000;
+            splitBoundaries.add(TimeBoundaries.of(max, UnsignedLong.MAX_VALUE.longValue()));
+            // +inf
+        }
+
+        long offset = (max - min) / CHUNKS_NO;
+
+        for (int i = 0; i < CHUNKS_NO - 1; i++) {
+            TimeBoundaries splitTimeBoundaries = TimeBoundaries.of(min + i * offset, min + (i + 1) * offset);
+            splitBoundaries.add(splitTimeBoundaries);
+        }
+        // in case of some modulo left
+        splitBoundaries.add(TimeBoundaries.of(min + (CHUNKS_NO - 1) * offset, max));
+        return splitBoundaries;
+    }
+
+    private List<TimeBoundaries> splitTimeBoundaries(TimeBoundaries timeRange)
+    {
+        Long min = timeRange.getStart();
+        Long max = timeRange.getEnd();
         long offset = (max - min) / CHUNKS_NO;
 
         List<TimeBoundaries> splitBoundaries = new ArrayList<>(CHUNKS_NO);

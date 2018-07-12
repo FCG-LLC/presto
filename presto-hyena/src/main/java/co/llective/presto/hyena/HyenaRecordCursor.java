@@ -111,6 +111,17 @@ public class HyenaRecordCursor
         }
 
         ScanOrFilters filters = predicateHandler.predicateToFilters(predicate);
+
+        timeBoundaries.ifPresent(timeBoundaries1 -> filters.forEach(x -> x.stream().filter(y -> y.getColumn() == 0).forEach(
+                y -> {
+                    if (y.getOp().equals(ScanComparison.Gt) && (Long) y.getValue() < timeBoundaries1.getStart()) {
+                        y.setValue(timeBoundaries1.getStart());
+                    }
+                    else if (y.getOp().equals(ScanComparison.Lt) && (Long) y.getValue() > timeBoundaries1.getEnd()) {
+                        y.setValue(timeBoundaries1.getEnd());
+                    }
+                })));
+
         req.getFilters().addAll(filters);
 
         if (streamingEnabled) {
