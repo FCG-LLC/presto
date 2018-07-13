@@ -112,12 +112,21 @@ public class HyenaRecordCursor
 
         ScanOrFilters filters = predicateHandler.predicateToFilters(predicate);
 
+        if (timeBoundaries.isPresent()) {
+            log.info("Time boundaries is present");
+        }
+        else {
+            log.info("Time boundaries is not present");
+        }
         timeBoundaries.ifPresent(timeBoundaries1 -> filters.forEach(x -> x.stream().filter(y -> y.getColumn() == 0).forEach(
                 y -> {
-                    if (y.getOp().equals(ScanComparison.Gt) && (Long) y.getValue() < timeBoundaries1.getStart()) {
+                    log.info("I'm checking time boundaries");
+                    if (y.getOp().equals(ScanComparison.Gt) || y.getOp().equals(ScanComparison.GtEq) && (Long) y.getValue() < timeBoundaries1.getStart()) {
+                        log.info("I'm setting low boundary to " + timeBoundaries1.getStart());
                         y.setValue(timeBoundaries1.getStart());
                     }
-                    else if (y.getOp().equals(ScanComparison.Lt) && (Long) y.getValue() > timeBoundaries1.getEnd()) {
+                    else if (y.getOp().equals(ScanComparison.Lt) || y.getOp().equals(ScanComparison.LtEq) && (Long) y.getValue() > timeBoundaries1.getEnd()) {
+                        log.info("I'm setting high boundary to " + timeBoundaries1.getEnd());
                         y.setValue(timeBoundaries1.getEnd());
                     }
                 })));
