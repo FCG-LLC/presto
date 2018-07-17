@@ -27,6 +27,7 @@ import org.testng.annotations.Test;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -48,7 +49,7 @@ public class HyenaRecordCursorTest
         @Test
         public void returnsZeroIfEmptyResult()
         {
-            ScanResult scanResult = new ScanResult(new HashMap<>());
+            ScanResult scanResult = new ScanResult(new HashMap<>(), Optional.empty());
 
             assertEquals(0, cursor.getRowCount(scanResult));
         }
@@ -62,7 +63,7 @@ public class HyenaRecordCursorTest
 
             Map<Long, ColumnValues> data = new HashMap<>();
             data.put(0L, column);
-            ScanResult scanResult = new ScanResult(data);
+            ScanResult scanResult = new ScanResult(data, Optional.empty());
 
             assertEquals(size, cursor.getRowCount(scanResult));
         }
@@ -75,7 +76,7 @@ public class HyenaRecordCursorTest
             ColumnValues column = new SparseNumberColumn(BlockType.I16Sparse, Slices.EMPTY_SLICE, Slices.EMPTY_SLICE, size);
             Map<Long, ColumnValues> data = new HashMap<>();
             data.put(0L, column);
-            ScanResult scanResult = new ScanResult(data);
+            ScanResult scanResult = new ScanResult(data, Optional.empty());
 
             assertEquals(size, cursor.getRowCount(scanResult));
         }
@@ -93,7 +94,7 @@ public class HyenaRecordCursorTest
             data.put(0L, smallerSparse);
             data.put(1L, greaterSparse);
 
-            ScanResult scanResult = new ScanResult(data);
+            ScanResult scanResult = new ScanResult(data, Optional.empty());
 
             assertEquals(greaterSize, cursor.getRowCount(scanResult));
         }
@@ -111,7 +112,7 @@ public class HyenaRecordCursorTest
             data.put(0L, sparse);
             data.put(1L, dense);
 
-            ScanResult scanResult = new ScanResult(data);
+            ScanResult scanResult = new ScanResult(data, Optional.empty());
 
             assertEquals(denseSize, cursor.getRowCount(scanResult));
         }
@@ -119,7 +120,7 @@ public class HyenaRecordCursorTest
         private HyenaRecordCursor initHyenaRecordCursor()
         {
             HyenaSession hyenaSession = mock(HyenaSession.class);
-            when(hyenaSession.scan(any())).thenReturn(new ScanResult(new HashMap<>()));
+            when(hyenaSession.scan(any())).thenReturn(new ScanResult(new HashMap<>(), Optional.empty()));
             HyenaColumnHandle handle = new HyenaColumnHandle("", IntegerType.INTEGER, BlockType.I16Sparse, 0);
             return new HyenaRecordCursor(hyenaSession, Collections.singletonList(handle), TupleDomain.all());
         }
