@@ -241,6 +241,20 @@ public final class U64Type
         return (a > ((Long.MAX_VALUE / b) * 2L) + ((((Long.MAX_VALUE % b) * 2L) + 1L) / b));
     }
 
+    public long multiplyBySignedLong(long u64, long signedLong)
+    {
+        if (signedLong < 0) {
+            throw new ArithmeticException("Cannot do unsigned * negative_signed = unsigned");
+        }
+        if (unsignedMultiplyOverflows(u64, signedLong)) {
+            throw new ArithmeticException(java.lang.String.format(
+                    "Unsigned multiplication overflow: %s * %s",
+                    UnsignedLong.fromLongBits(u64),
+                    signedLong));
+        }
+        return u64 * signedLong;
+    }
+
     public long divideBySignedInt(long u64, int signedInt)
     {
         if (signedInt < 0) {
@@ -249,12 +263,28 @@ public final class U64Type
         return Long.divideUnsigned(u64, signedInt);
     }
 
+    public long divideBySignedLong(long u64, long signedLong)
+    {
+        if (signedLong < 0) {
+            throw new ArithmeticException("Cannot do unsigned / negative_signed = unsigned");
+        }
+        return Long.divideUnsigned(u64, signedLong);
+    }
+
     public long moduloSignedInt(long u64, int signedInt)
     {
         if (signedInt < 0) {
             signedInt = Math.abs(signedInt);
         }
         return Long.remainderUnsigned(u64, signedInt);
+    }
+
+    public long moduloSignedLong(long u64, long signedLong)
+    {
+        if (signedLong < 0) {
+            signedLong = Math.abs(signedLong);
+        }
+        return Long.remainderUnsigned(u64, signedLong);
     }
 
     @Override
