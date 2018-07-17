@@ -83,10 +83,10 @@ public class HyenaRecordCursor
         //TODO: Remove when hyena will fully support source_id
         remapSourceIdFilter(this.scanRequest);
 
-        log.info("Scanning on creation of the cursor");
-        scanHyena();
+//        log.info("Scanning on creation of the cursor");
+//        scanHyena();
 
-        prepareSliceMappings();
+//        prepareSliceMappings();
 
         constructorFinishMs = System.currentTimeMillis();
     }
@@ -127,6 +127,8 @@ public class HyenaRecordCursor
         log.info("Scan + deserialization time: " + (scanFinish - scanStart) + "ms");
         rowCount = getRowCount(slicedResult);
         log.info("Received " + rowCount + " records");
+
+        prepareSliceMappings();
 
         endOfScan.set(!slicedResult.getStreamState().isPresent());
 
