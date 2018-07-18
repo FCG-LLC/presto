@@ -31,7 +31,10 @@ public class NativeHyenaSession
 
     public NativeHyenaSession(HyenaConfig config)
     {
-        hyenaApi = new HyenaApi(config.getHyenaHost());
+        hyenaApi = (new HyenaApi.Builder())
+                .address(config.getHyenaHost())
+                .nanomsgPullIntervalMs(config.getNanomsgPullInterval())
+                .build();
     }
 
     @Override

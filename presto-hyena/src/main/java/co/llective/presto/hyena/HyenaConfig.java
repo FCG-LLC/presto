@@ -20,11 +20,15 @@ public class HyenaConfig
 {
     private String hyenaHost = "localhost";
 
-    private Long streamingRecordsLimit = 200000L;
+    private Long defaultNanomsgPullInterval = 50L;
+    public static final String NANOMSG_PULL_INTERVAL_MS = "nanomsg_pull_interval_ms";
+    public static final String NANOMSG_PULL_INTERVAL_MS_DESC = "Amount of time in ms between message pulls from nanomsg socket";
+
+    private Long defaultStreamingRecordsLimit = 200000L;
     public static final String STREAMING_RECORDS_LIMIT = "streaming_records_limit";
     public static final String STREAMING_RECORDS_LIMIT_DESC = "Numbers of records fetched per subscan from hyena";
 
-    private Long streamingRecordsThreshold = 200000L;
+    private Long defaultStreamingRecordsThreshold = 200000L;
     public static final String STREAMING_RECORDS_THRESHOLD = "streaming_records_threshold";
     public static final String STREAMING_RECORDS_THRESHOLD_DESC = "Number of records which hyena can add/subtract to/from limit number";
 
@@ -33,14 +37,19 @@ public class HyenaConfig
         return hyenaHost;
     }
 
+    public long getNanomsgPullInterval()
+    {
+        return defaultNanomsgPullInterval;
+    }
+
     public long getStreamingRecordsLimit()
     {
-        return streamingRecordsLimit;
+        return defaultStreamingRecordsLimit;
     }
 
     public long getStreamingRecordsThreshold()
     {
-        return streamingRecordsThreshold;
+        return defaultStreamingRecordsThreshold;
     }
 
     @Config("hyena.url")
@@ -51,11 +60,19 @@ public class HyenaConfig
         return this;
     }
 
+    @Config("hyena." + NANOMSG_PULL_INTERVAL_MS)
+    @ConfigDescription(NANOMSG_PULL_INTERVAL_MS_DESC)
+    public HyenaConfig setNanomsgPullInterval(Long interval)
+    {
+        this.defaultNanomsgPullInterval = interval;
+        return this;
+    }
+
     @Config("hyena." + STREAMING_RECORDS_LIMIT)
     @ConfigDescription(STREAMING_RECORDS_LIMIT_DESC)
     public HyenaConfig setStreamingRecordsLimit(Long limit)
     {
-        this.streamingRecordsLimit = limit;
+        this.defaultStreamingRecordsLimit = limit;
         return this;
     }
 
@@ -63,7 +80,7 @@ public class HyenaConfig
     @ConfigDescription(STREAMING_RECORDS_THRESHOLD_DESC)
     public HyenaConfig setStreamingRecordsThreshold(Long threshold)
     {
-        this.streamingRecordsThreshold = threshold;
+        this.defaultStreamingRecordsThreshold = threshold;
         return this;
     }
 }
