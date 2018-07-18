@@ -83,11 +83,6 @@ public class HyenaRecordCursor
         //TODO: Remove when hyena will fully support source_id
         remapSourceIdFilter(this.scanRequest);
 
-//        log.info("Scanning on creation of the cursor");
-//        scanHyena();
-
-//        prepareSliceMappings();
-
         constructorFinishMs = System.currentTimeMillis();
     }
 
@@ -119,22 +114,25 @@ public class HyenaRecordCursor
         return req;
     }
 
-    private void scanHyena()
+    /**
+     * Fetches records from database.
+     * If there are 0 records in next chunk it tries until there will be results or it is the end of the scan.
+     */
+    private void fetchRecordsFromDb()
     {
-        long scanStart = System.currentTimeMillis();
-        slicedResult = hyenaSession.scan(scanRequest);
-        long scanFinish = System.currentTimeMillis();
-        log.info("Scan + deserialization time: " + (scanFinish - scanStart) + "ms");
-        rowCount = getRowCount(slicedResult);
-        log.info("Received " + rowCount + " records");
-
-        prepareSliceMappings();
-
-        endOfScan.set(!slicedResult.getStreamState().isPresent());
-
-        if (scanRequest.getScanConfig().isPresent() && slicedResult.getStreamState().isPresent()) {
-            scanRequest.getScanConfig().get().setStreamState(slicedResult.getStreamState());
-        }
+        do {
+            long scanStart = System.currentTimeMillis();
+            slicedResult = hyenaSession.scan(scanRequest);
+            long scanFinish = System.currentTimeMillis();
+            log.info("Scan + deserialization time: " + (scanFinish - scanStart) + "ms");
+            rowCount = getRowCount(slicedResult);
+            log.info("Received " + rowCount + " records");
+            prepareSliceMappings();
+            endOfScan.set(!slicedResult.getStreamState().isPresent());
+            if (scanRequest.getScanConfig().isPresent() && slicedResult.getStreamState().isPresent()) {
+                scanRequest.getScanConfig().get().setStreamState(slicedResult.getStreamState());
+            }
+        } while (rowCount == 0 || !endOfScan.get());
     }
 
     private void prepareSliceMappings()
@@ -237,26 +235,24 @@ public class HyenaRecordCursor
     @Override
     public boolean advanceNextPosition()
     {
-        if (rowPosition == -1) {
-            iteratingStartNs = System.nanoTime();
-        }
         if (++rowPosition < rowCount) {
             return true;
         }
         else {
-            //TODO
-            long iteratingEndNs = System.nanoTime();
-            log.info("Iterated through " + rowPosition + " rows, " + (rowPosition == 0 ? 0 : ((iteratingEndNs - iteratingStartNs) / rowPosition)) + "ns per row");
+            if (rowCount != 0) {
+                long iteratingEndNs = System.nanoTime();
+                log.info("Iterated through " + rowPosition + " rows, " + (rowPosition == 0 ? 0 : ((iteratingEndNs - iteratingStartNs) / rowPosition)) + "ns per row");
+            }
             if (endOfScan.get()) {
-                log.info("No more records in db. finishing.");
+                log.info("No more records in db. Finishing.");
                 return false;
             }
             else {
-                log.info("Cursor needs more data. Scanning again. (RowPosition - " + rowPosition + ")");
-                scanHyena();
+                log.info("Cursor needs more data. Scanning again.");
+                fetchRecordsFromDb();
                 rowPosition = 0;
                 iteratingStartNs = System.nanoTime();
-                return true;
+                return rowCount != 0;
             }
         }
     }
