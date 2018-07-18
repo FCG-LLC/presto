@@ -13,6 +13,7 @@
  */
 package co.llective.presto.hyena;
 
+import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.RecordSet;
 import com.facebook.presto.spi.predicate.TupleDomain;
@@ -30,8 +31,9 @@ public class HyenaRecordSet
     private final List<Type> columnTypes;
     private final TupleDomain<HyenaColumnHandle> effectivePredicate;
     private final HyenaSession hyenaSession;
+    private final ConnectorSession connectorSession;
 
-    public HyenaRecordSet(HyenaSession hyenaSession, HyenaSplit split, List<HyenaColumnHandle> columns)
+    public HyenaRecordSet(HyenaSession hyenaSession, ConnectorSession connectorSession, HyenaSplit split, List<HyenaColumnHandle> columns)
     {
         this.columns = requireNonNull(columns, "column handles is null");
         requireNonNull(split, "split is null");
@@ -44,6 +46,7 @@ public class HyenaRecordSet
         this.effectivePredicate = split.getEffectivePredicate();
 
         this.hyenaSession = requireNonNull(hyenaSession, "hyenaSession is null");
+        this.connectorSession = requireNonNull(connectorSession, "ConnectorSession is null");
     }
 
     @Override
@@ -55,6 +58,6 @@ public class HyenaRecordSet
     @Override
     public RecordCursor cursor()
     {
-        return new HyenaRecordCursor(hyenaSession, columns, effectivePredicate);
+        return new HyenaRecordCursor(hyenaSession, connectorSession, columns, effectivePredicate);
     }
 }

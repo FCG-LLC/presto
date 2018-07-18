@@ -22,6 +22,7 @@ import co.llective.hyena.api.ScanOrFilters;
 import co.llective.hyena.api.ScanRequest;
 import co.llective.hyena.api.ScanResult;
 import co.llective.hyena.api.StreamConfig;
+import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.Type;
@@ -48,13 +49,12 @@ public class HyenaRecordCursor
 {
     private static final Logger log = Logger.get(HyenaRecordCursor.class);
 
-    private static final Long LIMIT = 200000L;
-    private static final Long THRESHOLD = 200000L;
-
     private final List<HyenaColumnHandle> columns;
     private ScanResult slicedResult;
     private AtomicBoolean endOfScan = new AtomicBoolean(false);
     private final HyenaSession hyenaSession;
+    private final long streamingLimit;
+    private final long streamingThreshold;
     private ScanRequest scanRequest;
     private int rowPosition = -1; // presto first advances next row and then fetch data
     private int rowCount;
@@ -65,15 +65,17 @@ public class HyenaRecordCursor
     private long constructorFinishMs;
     private long iteratingStartNs;
 
-    public HyenaRecordCursor(HyenaSession hyenaSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
+    public HyenaRecordCursor(HyenaSession hyenaSession, ConnectorSession connectorSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
     {
-        this(new HyenaPredicatesUtil(), hyenaSession, columns, predicate);
+        this(new HyenaPredicatesUtil(), hyenaSession, connectorSession, columns, predicate);
     }
 
-    public HyenaRecordCursor(HyenaPredicatesUtil predicateHandler, HyenaSession hyenaSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
+    public HyenaRecordCursor(HyenaPredicatesUtil predicateHandler, HyenaSession hyenaSession, ConnectorSession connectorSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
     {
         constructorStartMs = System.currentTimeMillis();
         this.hyenaSession = hyenaSession;
+        this.streamingLimit = HyenaConnectorSessionProperties.getStreamingRecordsLimit(connectorSession);
+        this.streamingThreshold = HyenaConnectorSessionProperties.getStreamingRecordsThreshold(connectorSession);
         this.columns = requireNonNull(columns, "columns is null");
 
         this.scanRequest = buildScanRequest(predicateHandler, columns, predicate);
@@ -109,7 +111,7 @@ public class HyenaRecordCursor
         ScanOrFilters filters = predicateHandler.predicateToFilters(predicate);
         req.getFilters().addAll(filters);
 
-        StreamConfig scanConfig = new StreamConfig(LIMIT, THRESHOLD, Optional.empty());
+        StreamConfig scanConfig = new StreamConfig(streamingLimit, streamingThreshold, Optional.empty());
         req.setScanConfig(Optional.of(scanConfig));
         return req;
     }

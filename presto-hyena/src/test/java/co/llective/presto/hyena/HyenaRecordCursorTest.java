@@ -18,6 +18,7 @@ import co.llective.hyena.api.ColumnValues;
 import co.llective.hyena.api.DenseNumberColumn;
 import co.llective.hyena.api.ScanResult;
 import co.llective.hyena.api.SparseNumberColumn;
+import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.IntegerType;
 import io.airlift.slice.Slices;
@@ -120,9 +121,11 @@ public class HyenaRecordCursorTest
         private HyenaRecordCursor initHyenaRecordCursor()
         {
             HyenaSession hyenaSession = mock(HyenaSession.class);
+            ConnectorSession connectorSession = mock(ConnectorSession.class);
+            when(connectorSession.getProperty(any(), any())).thenReturn(10L);
             when(hyenaSession.scan(any())).thenReturn(new ScanResult(new HashMap<>(), Optional.empty()));
             HyenaColumnHandle handle = new HyenaColumnHandle("", IntegerType.INTEGER, BlockType.I16Sparse, 0);
-            return new HyenaRecordCursor(hyenaSession, Collections.singletonList(handle), TupleDomain.all());
+            return new HyenaRecordCursor(hyenaSession, connectorSession, Collections.singletonList(handle), TupleDomain.all());
         }
     }
 }
