@@ -35,6 +35,7 @@ public class HyenaModule
     {
         configBinder(binder).bindConfig(HyenaConfig.class);
 
+        binder.bind(HyenaConnectorSessionProperties.class).in(Scopes.SINGLETON);
         binder.bind(HyenaConnector.class).in(Scopes.SINGLETON);
         binder.bind(HyenaMetadata.class).in(Scopes.SINGLETON);
         binder.bind(HyenaSplitManager.class).in(Scopes.SINGLETON);

@@ -18,11 +18,14 @@ import com.facebook.presto.spi.connector.ConnectorMetadata;
 import com.facebook.presto.spi.connector.ConnectorRecordSetProvider;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
+import com.facebook.presto.spi.session.PropertyMetadata;
 import com.facebook.presto.spi.transaction.IsolationLevel;
 import io.airlift.bootstrap.LifeCycleManager;
 import io.airlift.log.Logger;
 
 import javax.inject.Inject;
+
+import java.util.List;
 
 import static com.facebook.presto.spi.transaction.IsolationLevel.READ_COMMITTED;
 import static com.facebook.presto.spi.transaction.IsolationLevel.checkConnectorSupports;
@@ -37,18 +40,21 @@ public class HyenaConnector
     private final HyenaMetadata metadata;
     private final HyenaSplitManager splitManager;
     private final HyenaRecordSetProvider recordSetProvider;
+    private final List<PropertyMetadata<?>> sessionProperties;
 
     @Inject
     public HyenaConnector(
             LifeCycleManager lifeCycleManager,
             HyenaMetadata metadata,
             HyenaSplitManager splitManager,
+            HyenaConnectorSessionProperties hyenaSessionProperties,
             HyenaRecordSetProvider recordSetProvider)
     {
         this.recordSetProvider = recordSetProvider;
         this.lifeCycleManager = requireNonNull(lifeCycleManager, "lifeCycleManager is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.splitManager = requireNonNull(splitManager, "splitManager is null");
+        this.sessionProperties = hyenaSessionProperties.getSessionProperties();
     }
 
     @Override
@@ -56,6 +62,12 @@ public class HyenaConnector
     {
         checkConnectorSupports(READ_COMMITTED, isolationLevel);
         return HyenaTransactionHandle.INSTANCE;
+    }
+
+    @Override
+    public List<PropertyMetadata<?>> getSessionProperties()
+    {
+        return sessionProperties;
     }
 
     @Override

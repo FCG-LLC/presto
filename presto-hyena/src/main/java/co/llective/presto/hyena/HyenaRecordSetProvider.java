@@ -49,6 +49,6 @@ public class HyenaRecordSetProvider
             handles.add((HyenaColumnHandle) handle);
         }
 
-        return new HyenaRecordSet(hyenaSession, hyenaSplit, handles.build());
+        return new HyenaRecordSet(hyenaSession, session, hyenaSplit, handles.build());
     }
 }
