@@ -4,15 +4,16 @@ import co.llective.hyena.api.BlockType;
 import co.llective.hyena.api.ScanComparison;
 import co.llective.hyena.api.ScanOrFilters;
 import co.llective.presto.hyena.types.U64Type;
+import co.llective.presto.hyena.util.TimeBoundaries;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.SortedRangeSet;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.VarcharType;
+import com.google.common.primitives.UnsignedLong;
 import io.airlift.slice.Slices;
 import org.testng.annotations.Test;
 
-import java.util.AbstractMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,7 +34,7 @@ public class HyenaPredicatesUtilUnitTest
         public void returnsEmptyWhenNoTimestamp()
         {
             TupleDomain<HyenaColumnHandle> tupleDomain = TupleDomain.withColumnDomains(new HashMap<>());
-            Optional<AbstractMap.SimpleEntry<Long, Long>> tsConstraints = predicatesUtil.getTsConstraints(tupleDomain);
+            Optional<TimeBoundaries> tsConstraints = predicatesUtil.getTsConstraints(tupleDomain);
             assertFalse(tsConstraints.isPresent());
         }
 
@@ -49,10 +50,10 @@ public class HyenaPredicatesUtilUnitTest
                             0),
                     Domain.singleValue(U64Type.U_64_TYPE, 1L));
             TupleDomain<HyenaColumnHandle> tupleDomain = TupleDomain.withColumnDomains(domainMap);
-            Optional<AbstractMap.SimpleEntry<Long, Long>> tsConstraints = predicatesUtil.getTsConstraints(tupleDomain);
+            Optional<TimeBoundaries> tsConstraints = predicatesUtil.getTsConstraints(tupleDomain);
             assertTrue(tsConstraints.isPresent());
-            assertEquals(tsConstraints.get().getKey().longValue(), 1L);
-            assertEquals(tsConstraints.get().getValue().longValue(), 1L);
+            assertEquals(tsConstraints.get().getStart().longValue(), 1L);
+            assertEquals(tsConstraints.get().getEnd().longValue(), 1L);
         }
 
         @Test
@@ -69,10 +70,10 @@ public class HyenaPredicatesUtilUnitTest
                             0),
                     domain);
             TupleDomain<HyenaColumnHandle> tupleDomain = TupleDomain.withColumnDomains(domainMap);
-            Optional<AbstractMap.SimpleEntry<Long, Long>> tsConstraints = predicatesUtil.getTsConstraints(tupleDomain);
+            Optional<TimeBoundaries> tsConstraints = predicatesUtil.getTsConstraints(tupleDomain);
             assertTrue(tsConstraints.isPresent());
-            assertEquals(tsConstraints.get().getKey().longValue(), 10L);
-            assertEquals(tsConstraints.get().getValue().longValue(), 20L);
+            assertEquals(tsConstraints.get().getStart().longValue(), 10L);
+            assertEquals(tsConstraints.get().getEnd().longValue(), 20L);
         }
 
         @Test
@@ -90,10 +91,50 @@ public class HyenaPredicatesUtilUnitTest
                             0),
                     domain);
             TupleDomain<HyenaColumnHandle> tupleDomain = TupleDomain.withColumnDomains(domainMap);
-            Optional<AbstractMap.SimpleEntry<Long, Long>> tsConstraints = predicatesUtil.getTsConstraints(tupleDomain);
+            Optional<TimeBoundaries> tsConstraints = predicatesUtil.getTsConstraints(tupleDomain);
             assertTrue(tsConstraints.isPresent());
-            assertEquals(tsConstraints.get().getKey().longValue(), 10L);
-            assertEquals(tsConstraints.get().getValue().longValue(), 40L);
+            assertEquals(tsConstraints.get().getStart().longValue(), 10L);
+            assertEquals(tsConstraints.get().getEnd().longValue(), 40L);
+        }
+
+        @Test
+        public void returnsUnsignedMaxWhenNoRightBoundary()
+        {
+            Map<HyenaColumnHandle, Domain> domainMap = new HashMap<>();
+            Range range1 = Range.greaterThanOrEqual(U64Type.U_64_TYPE, 10L);
+            Domain domain = Domain.create(SortedRangeSet.copyOf(U64Type.U_64_TYPE, Collections.singletonList(range1)), false);
+            domainMap.put(
+                    new HyenaColumnHandle(
+                            "timestamp",
+                            U64Type.U_64_TYPE,
+                            BlockType.U64Dense,
+                            0),
+                    domain);
+            TupleDomain<HyenaColumnHandle> tupleDomain = TupleDomain.withColumnDomains(domainMap);
+            Optional<TimeBoundaries> tsConstraints = predicatesUtil.getTsConstraints(tupleDomain);
+            assertTrue(tsConstraints.isPresent());
+            assertEquals(tsConstraints.get().getStart().longValue(), 10L);
+            assertEquals(tsConstraints.get().getEnd().longValue(), UnsignedLong.MAX_VALUE.longValue());
+        }
+
+        @Test
+        public void returnsUnsignedZeroWhenNoLeftBoundary()
+        {
+            Map<HyenaColumnHandle, Domain> domainMap = new HashMap<>();
+            Range range1 = Range.lessThanOrEqual(U64Type.U_64_TYPE, 10L);
+            Domain domain = Domain.create(SortedRangeSet.copyOf(U64Type.U_64_TYPE, Collections.singletonList(range1)), false);
+            domainMap.put(
+                    new HyenaColumnHandle(
+                            "timestamp",
+                            U64Type.U_64_TYPE,
+                            BlockType.U64Dense,
+                            0),
+                    domain);
+            TupleDomain<HyenaColumnHandle> tupleDomain = TupleDomain.withColumnDomains(domainMap);
+            Optional<TimeBoundaries> tsConstraints = predicatesUtil.getTsConstraints(tupleDomain);
+            assertTrue(tsConstraints.isPresent());
+            assertEquals(tsConstraints.get().getStart().longValue(), UnsignedLong.ZERO.longValue());
+            assertEquals(tsConstraints.get().getEnd().longValue(), 10L);
         }
     }
 

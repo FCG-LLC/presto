@@ -21,6 +21,7 @@ import co.llective.hyena.api.ScanFilter;
 import co.llective.hyena.api.ScanOrFilters;
 import co.llective.hyena.api.ScanRequest;
 import co.llective.hyena.api.ScanResult;
+import co.llective.presto.hyena.util.TimeBoundaries;
 import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.Type;
@@ -30,7 +31,6 @@ import io.airlift.slice.Slice;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -77,10 +77,10 @@ public class HyenaRecordCursor
             req.getProjection().add(col.getOrdinalPosition());
         }
 
-        Optional<AbstractMap.SimpleEntry<Long, Long>> tsBoundaries = predicateHandler.getTsConstraints(predicate);
+        Optional<TimeBoundaries> tsBoundaries = predicateHandler.getTsConstraints(predicate);
         if (tsBoundaries.isPresent()) {
-            req.setMinTs(tsBoundaries.get().getKey());
-            req.setMaxTs(tsBoundaries.get().getValue());
+            req.setMinTs(tsBoundaries.get().getStart());
+            req.setMaxTs(tsBoundaries.get().getEnd());
         }
         else {
             req.setMinTs(0L);

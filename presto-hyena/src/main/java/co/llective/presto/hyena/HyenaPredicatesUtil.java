@@ -19,6 +19,7 @@ import co.llective.hyena.api.ScanComparison;
 import co.llective.hyena.api.ScanFilter;
 import co.llective.hyena.api.ScanOrFilters;
 import co.llective.presto.hyena.types.U64Type;
+import co.llective.presto.hyena.util.TimeBoundaries;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.predicate.Marker;
 import com.facebook.presto.spi.predicate.Range;
@@ -27,7 +28,6 @@ import com.google.common.collect.Lists;
 import com.google.common.primitives.UnsignedLong;
 import io.airlift.slice.Slice;
 
-import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,7 +40,7 @@ public class HyenaPredicatesUtil
     public HyenaPredicatesUtil()
     {}
 
-    public Optional<AbstractMap.SimpleEntry<Long, Long>> getTsConstraints(TupleDomain<HyenaColumnHandle> predicate)
+    public Optional<TimeBoundaries> getTsConstraints(TupleDomain<HyenaColumnHandle> predicate)
     {
         if (predicate.getColumnDomains().isPresent()) {
             List<TupleDomain.ColumnDomain<HyenaColumnHandle>> columnDomains = predicate.getColumnDomains().get();
@@ -75,7 +75,13 @@ public class HyenaPredicatesUtil
                         }
                     }
                 }
-                return Optional.of(new AbstractMap.SimpleEntry<>(lowestValue, highestValue));
+                if (lowestValue == Long.MAX_VALUE) {
+                    lowestValue = UnsignedLong.ZERO.longValue();
+                }
+                if (highestValue == Long.MIN_VALUE) {
+                    highestValue = UnsignedLong.MAX_VALUE.longValue();
+                }
+                return Optional.of(TimeBoundaries.of(lowestValue, highestValue));
             }
         }
         return Optional.empty();
