@@ -49,16 +49,16 @@ public class HyenaRecordCursor
 {
     private static final Logger log = Logger.get(HyenaRecordCursor.class);
 
-    private static final Long LIMIT = 200000L;
-    private static final Long THRESHOLD = 200000L;
+    private static final Long LIMIT = 2000000L;
+    private static final Long THRESHOLD = 2000000L;
 
     private final List<HyenaColumnHandle> columns;
     private ScanResult slicedResult;
-    private AtomicBoolean endOfScan = new AtomicBoolean(false);
     private final HyenaSession hyenaSession;
     private ScanRequest scanRequest;
-    private int rowPosition = -1; // presto first advances next row and then fetch data
-    private int rowCount;
+    @VisibleForTesting AtomicBoolean endOfScan = new AtomicBoolean(false);
+    @VisibleForTesting int rowPosition = -1; // presto first advances next row and then fetch data
+    @VisibleForTesting int rowCount;
 
     private Map<Integer, ColumnValues> fieldsToColumns = new HashMap<>();
 
@@ -112,6 +112,7 @@ public class HyenaRecordCursor
 
         StreamConfig scanConfig = new StreamConfig(LIMIT, THRESHOLD, Optional.empty());
         req.setScanConfig(Optional.of(scanConfig));
+
         return req;
     }
 
@@ -119,7 +120,7 @@ public class HyenaRecordCursor
      * Fetches records from database.
      * If there are 0 records in next chunk it tries until there will be results or it is the end of the scan.
      */
-    private void fetchRecordsFromDb()
+    @VisibleForTesting void fetchRecordsFromDb()
     {
         do {
             long scanStart = System.currentTimeMillis();
@@ -128,15 +129,15 @@ public class HyenaRecordCursor
             log.debug("Scan + deserialization time: " + (scanFinish - scanStart) + "ms");
             rowCount = getRowCount(slicedResult);
             log.debug("Received " + rowCount + " records");
-            prepareSliceMappings();
             endOfScan.set(!slicedResult.getStreamState().isPresent());
             if (scanRequest.getScanConfig().isPresent() && slicedResult.getStreamState().isPresent()) {
                 scanRequest.getScanConfig().get().setStreamState(slicedResult.getStreamState());
             }
         } while (rowCount == 0 && !endOfScan.get());
+        prepareSliceMappings();
     }
 
-    private void prepareSliceMappings()
+    @VisibleForTesting void prepareSliceMappings()
     {
         for (int field = 0; field < columns.size(); field++) {
             long columnId = columns.get(field).getOrdinalPosition();
