@@ -49,8 +49,8 @@ public class HyenaRecordCursor
 {
     private static final Logger log = Logger.get(HyenaRecordCursor.class);
 
-    private static final Long LIMIT = 2000000L;
-    private static final Long THRESHOLD = 2000000L;
+    private final Long streamingLimit;
+    private final Long streamingThreshold;
 
     private final List<HyenaColumnHandle> columns;
     private ScanResult slicedResult;
@@ -76,6 +76,8 @@ public class HyenaRecordCursor
         constructorStartMs = System.currentTimeMillis();
         this.hyenaSession = hyenaSession;
         this.columns = requireNonNull(columns, "columns is null");
+        this.streamingLimit = HyenaConnectorSessionProperties.getStreamingRecordsLimit(connectorSession);
+        this.streamingThreshold = HyenaConnectorSessionProperties.getStreamingRecordsThreshold(connectorSession);
 
         this.scanRequest = buildScanRequest(predicateHandler, columns, predicate);
 
@@ -110,7 +112,7 @@ public class HyenaRecordCursor
         ScanOrFilters filters = predicateHandler.predicateToFilters(predicate);
         req.getFilters().addAll(filters);
 
-        StreamConfig scanConfig = new StreamConfig(LIMIT, THRESHOLD, Optional.empty());
+        StreamConfig scanConfig = new StreamConfig(streamingLimit, streamingThreshold, Optional.empty());
         req.setScanConfig(Optional.of(scanConfig));
 
         return req;
