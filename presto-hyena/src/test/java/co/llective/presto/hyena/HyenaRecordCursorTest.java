@@ -61,6 +61,7 @@ public class HyenaRecordCursorTest
         {
             session = mock(HyenaSession.class);
             connectorSession = mock(ConnectorSession.class);
+            when(connectorSession.getProperty(any(), any())).thenReturn(10L);
             cursor = spy(new HyenaRecordCursor(session, connectorSession, Collections.singletonList(column), TupleDomain.all()));
             doNothing().when(cursor).prepareSliceMappings();
         }
@@ -163,6 +164,7 @@ public class HyenaRecordCursorTest
         {
             session = mock(HyenaSession.class);
             connectorSession = mock(ConnectorSession.class);
+            when(connectorSession.getProperty(any(), any())).thenReturn(10L);
             cursor = spy(new HyenaRecordCursor(session, connectorSession, Collections.singletonList(column), TupleDomain.all()));
         }
 
@@ -320,6 +322,7 @@ public class HyenaRecordCursorTest
             HyenaSession hyenaSession = mock(HyenaSession.class);
             when(hyenaSession.scan(any())).thenReturn(new ScanResult(new HashMap<>(), Optional.empty()));
             ConnectorSession connectorSession = mock(ConnectorSession.class);
+            when(connectorSession.getProperty(any(), any())).thenReturn(10L);
             HyenaColumnHandle handle = new HyenaColumnHandle("", IntegerType.INTEGER, BlockType.I16Sparse, 0);
             return new HyenaRecordCursor(hyenaSession, connectorSession, Collections.singletonList(handle), TupleDomain.all());
         }
