@@ -20,6 +20,10 @@ public class HyenaConfig
 {
     private String hyenaHost = "localhost";
 
+    private Boolean streamingEnabled = true;
+    public static final String STREAMING_ENABLED = "streaming_enabled";
+    public static final String STREAMING_ENABLED_DESC = "Should records streaming be used";
+
     private Long streamingRecordsLimit = 200000L;
     public static final String STREAMING_RECORDS_LIMIT = "streaming_records_limit";
     public static final String STREAMING_RECORDS_LIMIT_DESC = "Numbers of records fetched per subscan from hyena";
@@ -31,6 +35,11 @@ public class HyenaConfig
     public String getHyenaHost()
     {
         return hyenaHost;
+    }
+
+    public boolean getStreamingEnabled()
+    {
+        return streamingEnabled;
     }
 
     public long getStreamingRecordsLimit()
@@ -48,6 +57,14 @@ public class HyenaConfig
     public HyenaConfig setHyenaHost(String hyenaHost)
     {
         this.hyenaHost = hyenaHost;
+        return this;
+    }
+
+    @Config("hyena." + STREAMING_ENABLED)
+    @ConfigDescription(STREAMING_ENABLED_DESC)
+    public HyenaConfig setStreamingEnabled(Boolean streamingEnabled)
+    {
+        this.streamingEnabled = streamingEnabled;
         return this;
     }
 
