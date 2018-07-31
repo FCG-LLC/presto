@@ -51,9 +51,12 @@ import com.facebook.presto.sql.tree.NotExpression;
 import com.facebook.presto.sql.tree.NullLiteral;
 import com.facebook.presto.sql.tree.StringLiteral;
 import com.facebook.presto.sql.tree.SymbolReference;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.PeekingIterator;
+import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
 
 import javax.annotation.Nullable;
 
@@ -68,6 +71,7 @@ import static com.facebook.presto.sql.ExpressionUtils.and;
 import static com.facebook.presto.sql.ExpressionUtils.combineConjuncts;
 import static com.facebook.presto.sql.ExpressionUtils.combineDisjunctsWithDefault;
 import static com.facebook.presto.sql.ExpressionUtils.or;
+import static com.facebook.presto.sql.gen.LikeHackUtility.UTF8_ESCAPE_SEPARATOR;
 import static com.facebook.presto.sql.tree.BooleanLiteral.FALSE_LITERAL;
 import static com.facebook.presto.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.EQUAL;
@@ -282,7 +286,7 @@ public final class DomainTranslator
         return new Visitor(metadata, session, types).process(predicate, false);
     }
 
-    private static class Visitor
+    @VisibleForTesting static class Visitor
             extends AstVisitor<ExtractionResult, Boolean>
     {
         private final Metadata metadata;
@@ -770,16 +774,57 @@ public final class DomainTranslator
             return new ExtractionResult(TupleDomain.none(), TRUE_LITERAL);
         }
 
+        /**
+         * Cleans string from escape chars. It does it in *sophisticated* manner, e.g. double escape char is reduced to single escape char.
+         * If input string is ending with escape char it leaves it as it is.
+         * @param string input string
+         * @param escapeChar escape char
+         * @return string without escape chars
+         */
+        @VisibleForTesting
+        static String removeEscapeSigns(String string, char escapeChar)
+        {
+            StringBuilder outputBuilder = new StringBuilder();
+
+            for (int i = 0; i < string.length(); i++) {
+                if (string.charAt(i) == escapeChar && i != string.length() - 1) {
+                    outputBuilder.append(string.charAt(++i));
+                }
+                else {
+                    outputBuilder.append(string.charAt(i));
+                }
+            }
+            return outputBuilder.toString();
+        }
+
         @Override
         protected ExtractionResult visitLikePredicate(LikePredicate node, Boolean complement)
         {
             // we are leaving also like predicate to know that it was
             // a like predicate and not just string-equal filter
             LikePredicate likePredicate = new LikePredicate(node.getValue(), node.getPattern(), node.getEscape());
+
+            Slice signedSlice;
+            if (node.getEscape() != null) {
+                String filterValue = ((StringLiteral) node.getPattern()).getSlice().toStringUtf8();
+                String escapeSign = ((StringLiteral) node.getEscape()).getSlice().toStringUtf8();
+                filterValue = removeEscapeSigns(filterValue, escapeSign.charAt(0));
+                signedSlice = attachEscapeSign(filterValue, escapeSign);
+            }
+            else {
+                signedSlice = ((StringLiteral) node.getPattern()).getSlice();
+            }
+
             return new ExtractionResult(
                     TupleDomain.withColumnDomains(
-                        ImmutableMap.of(Symbol.from(node.getValue()), Domain.singleValue(VarcharType.createUnboundedVarcharType(), ((StringLiteral) node.getPattern()).getSlice()))),
+                        ImmutableMap.of(Symbol.from(node.getValue()), Domain.singleValue(VarcharType.createUnboundedVarcharType(), signedSlice))),
                     complementIfNecessary(likePredicate, complement));
+        }
+
+        private Slice attachEscapeSign(String value, String escapeSign)
+        {
+            String resultString = escapeSign + UTF8_ESCAPE_SEPARATOR + value;
+            return Slices.utf8Slice(resultString);
         }
     }
 

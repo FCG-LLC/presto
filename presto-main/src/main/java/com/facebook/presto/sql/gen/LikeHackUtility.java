@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.sql.relational.Expressions.constant;
 
-class LikeHackUtility
+public class LikeHackUtility
 {
     LikeHackUtility() {}
 
@@ -143,10 +143,17 @@ class LikeHackUtility
         return constant(true, BOOLEAN);
     }
 
+    public static final char UTF8_ESCAPE_SEPARATOR = 0x11;
+
     private boolean isStringInRegex(String stringValue, Regex regex)
     {
-        Matcher matcher = regex.matcher(stringValue.getBytes());
-        int result = matcher.search(0, stringValue.length(), Option.DEFAULT);
+        String escapedValue = stringValue;
+        // taking care of separator character prefix if exists
+        if (stringValue.indexOf(UTF8_ESCAPE_SEPARATOR) != -1) {
+            escapedValue = stringValue.substring(2);
+        }
+        Matcher matcher = regex.matcher(escapedValue.getBytes());
+        int result = matcher.search(0, escapedValue.length(), Option.DEFAULT);
         return result != -1;
     }
 
