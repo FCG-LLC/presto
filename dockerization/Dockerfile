@@ -59,5 +59,8 @@ RUN chown -R presto.presto /opt/presto
 COPY launcher_entrypoint.sh /opt/presto/launcher_entrypoint.sh
 RUN chown presto:presto /opt/presto/launcher_entrypoint.sh
 
+COPY files/version.sh /version.sh
+RUN ln -s /version.sh /usr/bin/version
+
 USER presto
 ENTRYPOINT ["/opt/presto/launcher_entrypoint.sh"]
