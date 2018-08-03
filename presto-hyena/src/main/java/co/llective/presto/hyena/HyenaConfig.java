@@ -20,9 +20,36 @@ public class HyenaConfig
 {
     private String hyenaHost = "localhost";
 
+    private Boolean streamingEnabled = true;
+    public static final String STREAMING_ENABLED = "streaming_enabled";
+    public static final String STREAMING_ENABLED_DESC = "Should records streaming be used";
+
+    private Long streamingRecordsLimit = 200000L;
+    public static final String STREAMING_RECORDS_LIMIT = "streaming_records_limit";
+    public static final String STREAMING_RECORDS_LIMIT_DESC = "Numbers of records fetched per subscan from hyena";
+
+    private Long streamingRecordsThreshold = 200000L;
+    public static final String STREAMING_RECORDS_THRESHOLD = "streaming_records_threshold";
+    public static final String STREAMING_RECORDS_THRESHOLD_DESC = "Number of records which hyena can add/subtract to/from limit number";
+
     public String getHyenaHost()
     {
         return hyenaHost;
+    }
+
+    public boolean getStreamingEnabled()
+    {
+        return streamingEnabled;
+    }
+
+    public long getStreamingRecordsLimit()
+    {
+        return streamingRecordsLimit;
+    }
+
+    public long getStreamingRecordsThreshold()
+    {
+        return streamingRecordsThreshold;
     }
 
     @Config("hyena.url")
@@ -30,6 +57,30 @@ public class HyenaConfig
     public HyenaConfig setHyenaHost(String hyenaHost)
     {
         this.hyenaHost = hyenaHost;
+        return this;
+    }
+
+    @Config("hyena." + STREAMING_ENABLED)
+    @ConfigDescription(STREAMING_ENABLED_DESC)
+    public HyenaConfig setStreamingEnabled(Boolean streamingEnabled)
+    {
+        this.streamingEnabled = streamingEnabled;
+        return this;
+    }
+
+    @Config("hyena." + STREAMING_RECORDS_LIMIT)
+    @ConfigDescription(STREAMING_RECORDS_LIMIT_DESC)
+    public HyenaConfig setStreamingRecordsLimit(Long limit)
+    {
+        this.streamingRecordsLimit = limit;
+        return this;
+    }
+
+    @Config("hyena." + STREAMING_RECORDS_THRESHOLD)
+    @ConfigDescription(STREAMING_RECORDS_THRESHOLD_DESC)
+    public HyenaConfig setStreamingRecordsThreshold(Long threshold)
+    {
+        this.streamingRecordsThreshold = threshold;
         return this;
     }
 }

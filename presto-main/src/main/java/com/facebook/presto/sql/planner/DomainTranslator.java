@@ -32,6 +32,7 @@ import com.facebook.presto.spi.type.VarcharType;
 import com.facebook.presto.sql.ExpressionUtils;
 import com.facebook.presto.sql.FunctionInvoker;
 import com.facebook.presto.sql.analyzer.ExpressionAnalyzer;
+import com.facebook.presto.sql.gen.LikeHackUtility;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.AstVisitor;
 import com.facebook.presto.sql.tree.BetweenPredicate;
@@ -51,9 +52,11 @@ import com.facebook.presto.sql.tree.NotExpression;
 import com.facebook.presto.sql.tree.NullLiteral;
 import com.facebook.presto.sql.tree.StringLiteral;
 import com.facebook.presto.sql.tree.SymbolReference;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.PeekingIterator;
+import io.airlift.slice.Slices;
 
 import javax.annotation.Nullable;
 
@@ -282,7 +285,7 @@ public final class DomainTranslator
         return new Visitor(metadata, session, types).process(predicate, false);
     }
 
-    private static class Visitor
+    @VisibleForTesting static class Visitor
             extends AstVisitor<ExtractionResult, Boolean>
     {
         private final Metadata metadata;
@@ -770,15 +773,65 @@ public final class DomainTranslator
             return new ExtractionResult(TupleDomain.none(), TRUE_LITERAL);
         }
 
+        /**
+         * Cleans string from escape chars. It does it in *sophisticated* manner, e.g. double escape char is reduced to single escape char.
+         * If input string is ending with escape char it leaves it as it is.
+         * @param string input string
+         * @param escapeChar escape char
+         * @return string without escape chars
+         */
+        @VisibleForTesting
+        static String removeEscapeSigns(String string, char escapeChar)
+        {
+            StringBuilder outputBuilder = new StringBuilder();
+
+            for (int i = 0; i < string.length(); i++) {
+                if (string.charAt(i) == escapeChar && i != string.length() - 1) {
+                    outputBuilder.append(string.charAt(++i));
+                }
+                else {
+                    outputBuilder.append(string.charAt(i));
+                }
+            }
+            return outputBuilder.toString();
+        }
+
         @Override
         protected ExtractionResult visitLikePredicate(LikePredicate node, Boolean complement)
         {
+            LikeHackUtility utility = new LikeHackUtility();
+
             // we are leaving also like predicate to know that it was
             // a like predicate and not just string-equal filter
             LikePredicate likePredicate = new LikePredicate(node.getValue(), node.getPattern(), node.getEscape());
+
+            String filterValue = ((StringLiteral) node.getPattern()).getSlice().toStringUtf8();
+
+            List<String> splitStringFilterValues;
+            if (node.getEscape() != null) {
+                String escapeChar = ((StringLiteral) node.getEscape()).getSlice().toStringUtf8();
+                splitStringFilterValues = utility.splitLikeStrings(filterValue, Optional.of(escapeChar.charAt(0)))
+                        .stream()
+                        .map(x -> removeEscapeSigns(x, escapeChar.charAt(0)))
+                        .collect(toList());
+            }
+            else {
+                splitStringFilterValues = utility.splitLikeStrings(filterValue, Optional.empty());
+            }
+
+            List<Object> sliceFilterValues = splitStringFilterValues.stream().map(Slices::utf8Slice).collect(toList());
+
+            Domain domain;
+            if (splitStringFilterValues.size() == 1) {
+                domain = Domain.singleValue(VarcharType.createUnboundedVarcharType(), sliceFilterValues.get(0));
+            }
+            else {
+                domain = Domain.multipleValues(VarcharType.createUnboundedVarcharType(), sliceFilterValues);
+            }
+
             return new ExtractionResult(
                     TupleDomain.withColumnDomains(
-                        ImmutableMap.of(Symbol.from(node.getValue()), Domain.singleValue(VarcharType.createUnboundedVarcharType(), ((StringLiteral) node.getPattern()).getSlice()))),
+                    ImmutableMap.of(Symbol.from(node.getValue()), domain)),
                     complementIfNecessary(likePredicate, complement));
         }
     }

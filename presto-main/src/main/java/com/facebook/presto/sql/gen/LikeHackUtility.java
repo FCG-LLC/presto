@@ -3,12 +3,12 @@ package com.facebook.presto.sql.gen;
 import com.facebook.presto.sql.relational.CallExpression;
 import com.facebook.presto.sql.relational.ConstantExpression;
 import com.facebook.presto.sql.relational.RowExpression;
-import io.airlift.joni.Matcher;
-import io.airlift.joni.Option;
 import io.airlift.joni.Regex;
 import io.airlift.slice.Slice;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -17,9 +17,9 @@ import java.util.stream.Collectors;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.sql.relational.Expressions.constant;
 
-class LikeHackUtility
+public class LikeHackUtility
 {
-    LikeHackUtility() {}
+    public LikeHackUtility() {}
 
     /**
      * Removes String filters added during push-downing like expressions.
@@ -35,11 +35,11 @@ class LikeHackUtility
             if (!regexps.isEmpty()) {
                 remapAllRecursively(
                         filter.get(),
-                        (ce) -> isEqualRegexString(regexps, ce),
+                        this::isEqualLikeString,
                         tautologyExpression());
                 remapAllRecursively(
                         filter.get(),
-                        (ce) -> isInWithRegexStrings(regexps, ce),
+                        this::isInWithLikeStrings,
                         tautologyExpression());
             }
         }
@@ -100,7 +100,20 @@ class LikeHackUtility
         ).stream().filter(Optional::isPresent).map(Optional::get).collect(Collectors.toList());
     }
 
-    private boolean isEqualRegexString(List<Regex> regexps, CallExpression ce)
+    private boolean isStringLikePrefixed(String string)
+    {
+        if (string.isEmpty()) {
+            return false;
+        }
+        for (char specialChar : StringMetaCharacter.getAllCharacters()) {
+            if (specialChar == string.charAt(0)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isEqualLikeString(CallExpression ce)
     {
         return ce.getSignature().getName().equals("$operator$EQUAL")
                 && ce.getArguments().stream().filter(arg -> arg instanceof ConstantExpression).anyMatch(
@@ -110,16 +123,11 @@ class LikeHackUtility
                             return false;
                         }
                         String stringValue = ((Slice) value).toStringUtf8();
-                        for (Regex regex : regexps) {
-                            if (isStringInRegex(stringValue, regex)) {
-                                return true;
-                            }
-                        }
-                        return false;
+                        return isStringLikePrefixed(stringValue);
                     });
     }
 
-    private boolean isInWithRegexStrings(List<Regex> regexps, CallExpression ce)
+    private boolean isInWithLikeStrings(CallExpression ce)
     {
         return ce.getSignature().getName().equals("IN")
                 && ce.getArguments().stream().filter(arg -> arg instanceof ConstantExpression).allMatch(
@@ -129,12 +137,7 @@ class LikeHackUtility
                             return false;
                         }
                         String stringValue = ((Slice) value).toStringUtf8();
-                        for (Regex regex : regexps) {
-                            if (isStringInRegex(stringValue, regex)) {
-                                return true;
-                            }
-                        }
-                        return false;
+                        return isStringLikePrefixed(stringValue);
                     });
     }
 
@@ -143,11 +146,33 @@ class LikeHackUtility
         return constant(true, BOOLEAN);
     }
 
-    private boolean isStringInRegex(String stringValue, Regex regex)
+    public enum StringMetaCharacter
     {
-        Matcher matcher = regex.matcher(stringValue.getBytes());
-        int result = matcher.search(0, stringValue.length(), Option.DEFAULT);
-        return result != -1;
+        STARTS_WITH((char) 0x11),
+        ENDS_WITH((char) 0x12),
+        CONTAINS((char) 0x13);
+
+        private char unicodeCharacter;
+
+        StringMetaCharacter(char unicodeCharacter)
+        {
+            this.unicodeCharacter = unicodeCharacter;
+        }
+
+        public char getCharacter()
+        {
+            return unicodeCharacter;
+        }
+
+        public static char[] getAllCharacters()
+        {
+            StringMetaCharacter[] enumValues = StringMetaCharacter.class.getEnumConstants();
+            char[] characters = new char[enumValues.length];
+            for (int i = 0; i < enumValues.length; i++) {
+                characters[i] = enumValues[i].getCharacter();
+            }
+            return characters;
+        }
     }
 
     private class RecursiveResult
@@ -171,6 +196,92 @@ class LikeHackUtility
         void addEntry(CallExpression entry)
         {
             this.foundEntries.add(entry);
+        }
+    }
+
+    private static final String WILDCARD = "%";
+
+    /**
+     * Splits like filter value string into list of strings basing on wildcard presence.
+     * Output strings are preceded with special character ({@see SingleMetaCharacter} if it's not exact match.
+     *
+     * e.g. "%asd%%q\%we" where escape sign is "\" is split to ["asd", "q\%we"], where "asd" is preceded with {@link StringMetaCharacter#CONTAINS} sign
+     * and "q\%we" is preceded with {@link StringMetaCharacter#ENDS_WITH} one.
+     *
+     * If string without wildcard is provided, the same string is returned in one-element list.
+     * Multiple wildcards after each other reduce to single one.
+     *
+     * @param string string to analyze
+     * @param escapeChar optional escape char for given filter
+     * @return List of strings preceded by {@link StringMetaCharacter} character.
+     */
+    public List<String> splitLikeStrings(String string, Optional<Character> escapeChar)
+    {
+        if (string.isEmpty()) {
+            return Collections.singletonList(string);
+        }
+
+        String wildcardRegex;
+        wildcardRegex = escapeChar
+                .map(character -> {
+                    String stringEscape = String.valueOf(character);
+                    // handle special regex escape sign
+                    if (character == '\\') {
+                        stringEscape = stringEscape + stringEscape;
+                    }
+                    // match 1 or more wildcards but not preceded by escape char
+                    return "(?<!" + stringEscape + "{1,1})" + WILDCARD + "+";
+                })
+                .orElse(WILDCARD + "+");
+
+        List<String> splitLikeStrings = Arrays.asList(string.split(wildcardRegex, -1));
+
+        if (splitLikeStrings.stream().allMatch(String::isEmpty)) {
+            return Collections.singletonList(String.valueOf(StringMetaCharacter.CONTAINS.getCharacter()));
+        }
+
+        if (splitLikeStrings.size() == 1) {
+            return Collections.singletonList(splitLikeStrings.get(0));
+        }
+
+        List<WildcardedString> wildcardedStrings = new ArrayList<>();
+        for (int i = 1; i < splitLikeStrings.size() - 1; i++) {
+            WildcardedString wildcardedString = new WildcardedString(splitLikeStrings.get(i), StringMetaCharacter.CONTAINS);
+            wildcardedStrings.add(wildcardedString);
+        }
+
+        if (!splitLikeStrings.get(0).isEmpty()) {
+            WildcardedString wildcardedString = new WildcardedString(splitLikeStrings.get(0), StringMetaCharacter.STARTS_WITH);
+            wildcardedStrings.add(0, wildcardedString);
+        }
+
+        if (!splitLikeStrings.get(splitLikeStrings.size() - 1).isEmpty()) {
+            WildcardedString wildcardedString = new WildcardedString(splitLikeStrings.get(splitLikeStrings.size() - 1), StringMetaCharacter.ENDS_WITH);
+            wildcardedStrings.add(wildcardedString);
+        }
+
+        return wildcardedStrings.stream().map(ws -> ws.getWildcard().getCharacter() + ws.getStringValue()).collect(Collectors.toList());
+    }
+
+    private class WildcardedString
+    {
+        private String stringValue;
+        private StringMetaCharacter wildcard;
+
+        private WildcardedString(String stringValue, StringMetaCharacter wildcard)
+        {
+            this.stringValue = stringValue;
+            this.wildcard = wildcard;
+        }
+
+        private String getStringValue()
+        {
+            return stringValue;
+        }
+
+        private StringMetaCharacter getWildcard()
+        {
+            return wildcard;
         }
     }
 }

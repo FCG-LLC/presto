@@ -21,6 +21,7 @@ import co.llective.hyena.api.ScanFilter;
 import co.llective.hyena.api.ScanOrFilters;
 import co.llective.hyena.api.ScanRequest;
 import co.llective.hyena.api.ScanResult;
+import co.llective.hyena.api.StreamConfig;
 import co.llective.presto.hyena.util.TimeBoundaries;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.RecordCursor;
@@ -38,6 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -47,17 +49,22 @@ public class HyenaRecordCursor
 {
     private static final Logger log = Logger.get(HyenaRecordCursor.class);
 
+    private final Long streamingLimit;
+    private final Long streamingThreshold;
+    private final Boolean streamingEnabled;
+
     private final List<HyenaColumnHandle> columns;
-    private final ScanResult slicedResult;
-    private int rowPosition = -1; // presto first advances next row and then fetch data
-    private final int rowCount;
+    private ScanResult slicedResult;
+    private final HyenaSession hyenaSession;
+    private ScanRequest scanRequest;
+    @VisibleForTesting AtomicBoolean endOfScan = new AtomicBoolean(false);
+    @VisibleForTesting int rowPosition = -1; // presto first advances next row and then fetch data
+    @VisibleForTesting int rowCount;
 
     private Map<Integer, ColumnValues> fieldsToColumns = new HashMap<>();
 
     private long constructorStartMs;
     private long constructorFinishMs;
-    private long scanStart;
-    private long scanFinish;
     private long iteratingStartNs;
 
     public HyenaRecordCursor(HyenaSession hyenaSession, ConnectorSession connectorSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
@@ -68,8 +75,24 @@ public class HyenaRecordCursor
     public HyenaRecordCursor(HyenaPredicatesUtil predicateHandler, HyenaSession hyenaSession, ConnectorSession connectorSession, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
     {
         constructorStartMs = System.currentTimeMillis();
+        this.hyenaSession = hyenaSession;
         this.columns = requireNonNull(columns, "columns is null");
+        this.streamingEnabled = HyenaConnectorSessionProperties.getStreamingEnabled(connectorSession);
+        this.streamingLimit = HyenaConnectorSessionProperties.getStreamingRecordsLimit(connectorSession);
+        this.streamingThreshold = HyenaConnectorSessionProperties.getStreamingRecordsThreshold(connectorSession);
 
+        this.scanRequest = buildScanRequest(predicateHandler, columns, predicate);
+
+        log.info("Filters: " + StringUtils.join(this.scanRequest.getFilters(), ", "));
+
+        //TODO: Remove when hyena will fully support source_id
+        remapSourceIdFilter(this.scanRequest);
+
+        constructorFinishMs = System.currentTimeMillis();
+    }
+
+    private ScanRequest buildScanRequest(HyenaPredicatesUtil predicateHandler, List<HyenaColumnHandle> columns, TupleDomain<HyenaColumnHandle> predicate)
+    {
         ScanRequest req = new ScanRequest();
         req.setProjection(new ArrayList<>());
         req.setFilters(new ScanOrFilters());
@@ -91,22 +114,39 @@ public class HyenaRecordCursor
         ScanOrFilters filters = predicateHandler.predicateToFilters(predicate);
         req.getFilters().addAll(filters);
 
-        log.info("Filters: " + StringUtils.join(req.getFilters(), ", "));
+        if (streamingEnabled) {
+            StreamConfig scanConfig = new StreamConfig(streamingLimit, streamingThreshold, Optional.empty());
+            req.setScanConfig(Optional.of(scanConfig));
+        }
+        else {
+            req.setScanConfig(Optional.empty());
+        }
 
-        //TODO: Remove when hyena will fully support source_id
-        remapSourceIdFilter(req);
-
-        scanStart = System.currentTimeMillis();
-        slicedResult = hyenaSession.scan(req);
-        scanFinish = System.currentTimeMillis();
-        rowCount = getRowCount(slicedResult);
-        prepareSliceMappings();
-
-        log.info("Received " + rowCount + " records");
-        constructorFinishMs = System.currentTimeMillis();
+        return req;
     }
 
-    private void prepareSliceMappings()
+    /**
+     * Fetches records from database.
+     * If there are 0 records in next chunk it tries until there will be results or it is the end of the scan.
+     */
+    @VisibleForTesting void fetchRecordsFromDb()
+    {
+        do {
+            long scanStart = System.currentTimeMillis();
+            slicedResult = hyenaSession.scan(scanRequest);
+            long scanFinish = System.currentTimeMillis();
+            log.debug("Scan + deserialization time: " + (scanFinish - scanStart) + "ms");
+            rowCount = getRowCount(slicedResult);
+            log.debug("Received " + rowCount + " records");
+            endOfScan.set(!slicedResult.getStreamState().isPresent());
+            if (scanRequest.getScanConfig().isPresent() && slicedResult.getStreamState().isPresent()) {
+                scanRequest.getScanConfig().get().setStreamState(slicedResult.getStreamState());
+            }
+        } while (rowCount == 0 && !endOfScan.get());
+        prepareSliceMappings();
+    }
+
+    @VisibleForTesting void prepareSliceMappings()
     {
         for (int field = 0; field < columns.size(); field++) {
             long columnId = columns.get(field).getOrdinalPosition();
@@ -206,10 +246,26 @@ public class HyenaRecordCursor
     @Override
     public boolean advanceNextPosition()
     {
-        if (rowPosition == -1) {
-            iteratingStartNs = System.nanoTime();
+        if (++rowPosition < rowCount) {
+            return true;
         }
-        return ++rowPosition < rowCount;
+        else {
+            if (rowCount != 0) {
+                long iteratingEndNs = System.nanoTime();
+                log.debug("Iterated through " + rowPosition + " rows, " + (rowPosition == 0 ? 0 : ((iteratingEndNs - iteratingStartNs) / rowPosition)) + "ns per row");
+            }
+            if (endOfScan.get()) {
+                log.debug("No more records in db. Finishing.");
+                return false;
+            }
+            else {
+                log.debug("Cursor needs more data. Scanning again.");
+                fetchRecordsFromDb();
+                rowPosition = 0;
+                iteratingStartNs = System.nanoTime();
+                return rowCount != 0;
+            }
+        }
     }
 
     @Override
@@ -275,12 +331,8 @@ public class HyenaRecordCursor
     public void close()
     {
         long closeTimeMs = System.currentTimeMillis();
-        long iteratingTimeNs = (System.nanoTime() - iteratingStartNs);
-        log.warn("Scan + deserialization time: " + (scanFinish - scanStart) + "ms");
-        log.warn("Constructor time: " + (constructorFinishMs - constructorStartMs) + "ms");
-        log.warn("Iterating time: " + (iteratingTimeNs / 1000000) + "ms");
-        log.warn("Iterated through " + rowPosition + " rows, " + (rowPosition == 0 ? 0 : (iteratingTimeNs / rowPosition)) + "ns per row");
-        log.warn("Whole cursor job: " + (closeTimeMs - constructorStartMs) + "ms");
+        log.debug("Constructor time: " + (constructorFinishMs - constructorStartMs) + "ms");
+        log.debug("Whole cursor job: " + (closeTimeMs - constructorStartMs) + "ms");
         //TODO: cancel query in hyenaAPI (send abort request with requestID)
     }
 }
