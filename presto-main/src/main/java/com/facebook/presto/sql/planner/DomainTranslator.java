@@ -32,6 +32,7 @@ import com.facebook.presto.spi.type.VarcharType;
 import com.facebook.presto.sql.ExpressionUtils;
 import com.facebook.presto.sql.FunctionInvoker;
 import com.facebook.presto.sql.analyzer.ExpressionAnalyzer;
+import com.facebook.presto.sql.gen.LikeHackUtility;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.AstVisitor;
 import com.facebook.presto.sql.tree.BetweenPredicate;
@@ -55,7 +56,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.PeekingIterator;
-import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 
 import javax.annotation.Nullable;
@@ -71,7 +71,6 @@ import static com.facebook.presto.sql.ExpressionUtils.and;
 import static com.facebook.presto.sql.ExpressionUtils.combineConjuncts;
 import static com.facebook.presto.sql.ExpressionUtils.combineDisjunctsWithDefault;
 import static com.facebook.presto.sql.ExpressionUtils.or;
-import static com.facebook.presto.sql.gen.LikeHackUtility.UTF8_ESCAPE_SEPARATOR;
 import static com.facebook.presto.sql.tree.BooleanLiteral.FALSE_LITERAL;
 import static com.facebook.presto.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.EQUAL;
@@ -800,31 +799,40 @@ public final class DomainTranslator
         @Override
         protected ExtractionResult visitLikePredicate(LikePredicate node, Boolean complement)
         {
+            LikeHackUtility utility = new LikeHackUtility();
+
             // we are leaving also like predicate to know that it was
             // a like predicate and not just string-equal filter
             LikePredicate likePredicate = new LikePredicate(node.getValue(), node.getPattern(), node.getEscape());
 
-            Slice signedSlice;
+            String filterValue = ((StringLiteral) node.getPattern()).getSlice().toStringUtf8();
+
+            List<String> splitStringFilterValues;
             if (node.getEscape() != null) {
-                String filterValue = ((StringLiteral) node.getPattern()).getSlice().toStringUtf8();
-                String escapeSign = ((StringLiteral) node.getEscape()).getSlice().toStringUtf8();
-                filterValue = removeEscapeSigns(filterValue, escapeSign.charAt(0));
-                signedSlice = attachEscapeSign(filterValue, escapeSign);
+                String escapeChar = ((StringLiteral) node.getEscape()).getSlice().toStringUtf8();
+                splitStringFilterValues = utility.splitLikeStrings(filterValue, Optional.of(escapeChar.charAt(0)))
+                        .stream()
+                        .map(x -> removeEscapeSigns(x, escapeChar.charAt(0)))
+                        .collect(toList());
             }
             else {
-                signedSlice = ((StringLiteral) node.getPattern()).getSlice();
+                splitStringFilterValues = utility.splitLikeStrings(filterValue, Optional.empty());
+            }
+
+            List<Object> sliceFilterValues = splitStringFilterValues.stream().map(Slices::utf8Slice).collect(toList());
+
+            Domain domain;
+            if (splitStringFilterValues.size() == 1) {
+                domain = Domain.singleValue(VarcharType.createUnboundedVarcharType(), sliceFilterValues.get(0));
+            }
+            else {
+                domain = Domain.multipleValues(VarcharType.createUnboundedVarcharType(), sliceFilterValues);
             }
 
             return new ExtractionResult(
                     TupleDomain.withColumnDomains(
-                        ImmutableMap.of(Symbol.from(node.getValue()), Domain.singleValue(VarcharType.createUnboundedVarcharType(), signedSlice))),
+                    ImmutableMap.of(Symbol.from(node.getValue()), domain)),
                     complementIfNecessary(likePredicate, complement));
-        }
-
-        private Slice attachEscapeSign(String value, String escapeSign)
-        {
-            String resultString = escapeSign + UTF8_ESCAPE_SEPARATOR + value;
-            return Slices.utf8Slice(resultString);
         }
     }
 
