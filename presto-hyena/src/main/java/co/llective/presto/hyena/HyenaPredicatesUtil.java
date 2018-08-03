@@ -24,7 +24,6 @@ import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.predicate.Marker;
 import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.TupleDomain;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.UnsignedLong;
 import io.airlift.slice.Slice;
@@ -305,82 +304,40 @@ public class HyenaPredicatesUtil
                 value);
     }
 
-    private static final char UTF8_SEPARATOR = 0x11;
-    private static final char WILDCARD_SIGN = '%';
-    private static final String WILDCARD_SIGN_STRING = String.valueOf(WILDCARD_SIGN);
-
     /**
-     * It checks if on the beginning of the string there is a special character/separator (0x11) separating escapeChar from rest of the string.
-     * If so, it extracts it and returns pair which contains string without separator & escape character and escape character.
+     * It checks if on the beginning of the string there is a special character/separator (0x11, 0x12, 0x13 - LikeHackUtility#StringMetaCharacter)
+     * to determine what kind of like filter value this string is.
      *
-     * If there is no special character in string it returns pair containing string and empty escaping character.
-     * @param string input string
-     * @return pair, where left side is character without separator sequence and right side which is optional of escaping character.
+     * If there is no special character in string it means that it is equal/matches operator.
+     * @param filterValue input string
+     * @return pair, where left side is string without special character and on the right side is {@link ScanComparison} operator.
      */
-    @VisibleForTesting Pair<String, Optional<Character>> extractEscapeChar(String string)
+    private Pair<String, ScanComparison> extractStringOperator(String filterValue)
     {
-        if (string.indexOf(UTF8_SEPARATOR) != -1) {
-            int separatorIx = string.indexOf(UTF8_SEPARATOR);
-            int escapeSignIx = separatorIx - 1;
-            char escapeSign = string.charAt(escapeSignIx);
-            String cleanString = string.replace(
-                    String.valueOf(new char[] {escapeSign, UTF8_SEPARATOR}),
-                    "");
-            return Pair.of(cleanString, Optional.of(escapeSign));
+        if (filterValue.isEmpty()) {
+            return Pair.of(filterValue, ScanComparison.Matches);
         }
-        else {
-            return Pair.of(string, Optional.empty());
+
+        // Special characters are defined in LikeHackUtility#StringMetaCharacter
+        switch (filterValue.charAt(0)) {
+            case 0x11:
+                return Pair.of(filterValue.substring(1), ScanComparison.StartsWith);
+            case 0x12:
+                return Pair.of(filterValue.substring(1), ScanComparison.EndsWith);
+            case 0x13:
+                return Pair.of(filterValue.substring(1), ScanComparison.Contains);
+            default:
+                return Pair.of(filterValue, ScanComparison.Matches);
         }
     }
 
     private ScanFilter createStringFilter(HyenaColumnHandle column, ScanComparison op, String value)
     {
-        Pair<String, Optional<Character>> extractedStringValue = extractEscapeChar(value);
-
-        value = extractedStringValue.getLeft();
-        Optional<Character> escapeCharacter = extractedStringValue.getRight();
-
-        if (escapeCharacter.isPresent()) {
-            String escapedWildcard = String.valueOf(
-                    new char[] {escapeCharacter.get(), WILDCARD_SIGN});
-            if (value.startsWith(WILDCARD_SIGN_STRING) && value.endsWith(WILDCARD_SIGN_STRING) && !value.endsWith(escapedWildcard)) {
-                op = ScanComparison.Contains;
-                value = value.substring(1, value.length() - 1);
-            }
-            else if (value.startsWith(WILDCARD_SIGN_STRING)) {
-                op = ScanComparison.EndsWith;
-                value = value.substring(1, value.length());
-            }
-            else if (value.endsWith(WILDCARD_SIGN_STRING) && !value.endsWith(escapedWildcard)) {
-                op = ScanComparison.StartsWith;
-                value = value.substring(0, value.length() - 1);
-            }
-            else {
-                op = ScanComparison.Matches;
-            }
-        }
-        else {
-            if (value.startsWith(WILDCARD_SIGN_STRING) && value.endsWith(WILDCARD_SIGN_STRING)) {
-                op = ScanComparison.Contains;
-                value = value.substring(1, value.length() - 1);
-            }
-            else if (value.startsWith(WILDCARD_SIGN_STRING)) {
-                op = ScanComparison.EndsWith;
-                value = value.substring(0, value.length() - 1);
-            }
-            else if (value.endsWith(WILDCARD_SIGN_STRING)) {
-                op = ScanComparison.StartsWith;
-                value = value.substring(1, value.length());
-            }
-            else {
-                op = ScanComparison.Matches;
-            }
-        }
-
+        Pair<String, ScanComparison> filterWithOperator = extractStringOperator(value);
         return new ScanFilter(
                 column.getOrdinalPosition(),
-                op,
+                filterWithOperator.getRight(),
                 column.getHyenaType().mapToFilterType(),
-                value);
+                filterWithOperator.getLeft());
     }
 }
