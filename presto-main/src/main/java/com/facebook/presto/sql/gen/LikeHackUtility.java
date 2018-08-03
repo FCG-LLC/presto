@@ -217,6 +217,10 @@ public class LikeHackUtility
      */
     public List<String> splitLikeStrings(String string, Optional<Character> escapeChar)
     {
+        if (string.isEmpty()) {
+            return Collections.singletonList(string);
+        }
+
         String wildcardRegex;
         wildcardRegex = escapeChar
                 .map(character -> {
@@ -233,7 +237,7 @@ public class LikeHackUtility
         List<String> splitLikeStrings = Arrays.asList(string.split(wildcardRegex, -1));
 
         if (splitLikeStrings.stream().allMatch(String::isEmpty)) {
-            return Collections.singletonList("");
+            return Collections.singletonList(String.valueOf(StringMetaCharacter.CONTAINS.getCharacter()));
         }
 
         if (splitLikeStrings.size() == 1) {
@@ -259,23 +263,23 @@ public class LikeHackUtility
         return wildcardedStrings.stream().map(ws -> ws.getWildcard().getCharacter() + ws.getStringValue()).collect(Collectors.toList());
     }
 
-    public class WildcardedString
+    private class WildcardedString
     {
         private String stringValue;
         private StringMetaCharacter wildcard;
 
-        public WildcardedString(String stringValue, StringMetaCharacter wildcard)
+        private WildcardedString(String stringValue, StringMetaCharacter wildcard)
         {
             this.stringValue = stringValue;
             this.wildcard = wildcard;
         }
 
-        public String getStringValue()
+        private String getStringValue()
         {
             return stringValue;
         }
 
-        public StringMetaCharacter getWildcard()
+        private StringMetaCharacter getWildcard()
         {
             return wildcard;
         }
