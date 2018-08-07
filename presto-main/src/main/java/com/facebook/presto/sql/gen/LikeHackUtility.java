@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
@@ -224,13 +225,9 @@ public class LikeHackUtility
         String wildcardRegex;
         wildcardRegex = escapeChar
                 .map(character -> {
-                    String stringEscape = String.valueOf(character);
-                    // handle special regex escape sign
-                    if (character == '\\') {
-                        stringEscape = stringEscape + stringEscape;
-                    }
+                    String escapedEscape = Pattern.quote(String.valueOf(character));
                     // match 1 or more wildcards but not preceded by escape char
-                    return "(?<!" + stringEscape + "{1,1})" + WILDCARD + "+";
+                    return "(?<!" + escapedEscape + "{1,1})" + WILDCARD + "+";
                 })
                 .orElse(WILDCARD + "+");
 

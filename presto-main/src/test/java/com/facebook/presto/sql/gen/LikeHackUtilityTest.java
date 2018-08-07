@@ -36,6 +36,16 @@ public class LikeHackUtilityTest
         }
 
         @Test
+        public void splitsWhenUsingSpecialSignAsWildcard()
+        {
+            String input = "a$%sd%dsa";
+            List<String> result = utility.splitLikeStrings(input, Optional.of('$'));
+            assertEquals(result.size(), 2);
+            assertEquals(result.get(0), STARTS_WITH.getCharacter() + "a$%sd");
+            assertEquals(result.get(1), ENDS_WITH.getCharacter() + "dsa");
+        }
+
+        @Test
         public void returnsEndWhenWildcardOnBeginning()
         {
             String input = "%asd";
