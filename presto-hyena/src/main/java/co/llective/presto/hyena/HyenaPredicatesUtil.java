@@ -27,6 +27,7 @@ import com.facebook.presto.spi.predicate.TupleDomain;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.UnsignedLong;
 import io.airlift.slice.Slice;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.List;
 import java.util.Map;
@@ -303,40 +304,40 @@ public class HyenaPredicatesUtil
                 value);
     }
 
-    private ScanFilter createStringFilter(HyenaColumnHandle column, ScanComparison op, String value)
+    /**
+     * It checks if on the beginning of the string there is a special character/separator (0x11, 0x12, 0x13 - LikeHackUtility#StringMetaCharacter)
+     * to determine what kind of like filter value this string is.
+     *
+     * If there is no special character in string it means that it is equal/matches operator.
+     * @param filterValue input string
+     * @return pair, where left side is string without special character and on the right side is {@link ScanComparison} operator.
+     */
+    private Pair<String, ScanComparison> extractStringOperator(String filterValue)
     {
-        if (value.startsWith("%") && value.endsWith("%")) {
-            op = ScanComparison.Contains;
-        }
-        else if (value.startsWith("%")) {
-            op = ScanComparison.EndsWith;
-        }
-        else if (value.endsWith("%")) {
-            op = ScanComparison.StartsWith;
-        }
-        else {
-            op = ScanComparison.Matches;
+        if (filterValue.isEmpty()) {
+            return Pair.of(filterValue, ScanComparison.Matches);
         }
 
-        return new ScanFilter(
-                column.getOrdinalPosition(),
-                op,
-                column.getHyenaType().mapToFilterType(),
-                escapeLikeChars(value));
+        // Special characters are defined in LikeHackUtility#StringMetaCharacter
+        switch (filterValue.charAt(0)) {
+            case 0x11:
+                return Pair.of(filterValue.substring(1), ScanComparison.StartsWith);
+            case 0x12:
+                return Pair.of(filterValue.substring(1), ScanComparison.EndsWith);
+            case 0x13:
+                return Pair.of(filterValue.substring(1), ScanComparison.Contains);
+            default:
+                return Pair.of(filterValue, ScanComparison.Matches);
+        }
     }
 
-    private String escapeLikeChars(String likedValue)
+    private ScanFilter createStringFilter(HyenaColumnHandle column, ScanComparison op, String value)
     {
-        String escapedString = likedValue;
-        if (escapedString.length() == 0) {
-            return escapedString;
-        }
-        if (escapedString.startsWith("%")) {
-            escapedString = escapedString.substring(1, escapedString.length());
-        }
-        if (escapedString.endsWith("%")) {
-            escapedString = escapedString.substring(0, escapedString.length() - 1);
-        }
-        return escapedString;
+        Pair<String, ScanComparison> filterWithOperator = extractStringOperator(value);
+        return new ScanFilter(
+                column.getOrdinalPosition(),
+                filterWithOperator.getRight(),
+                column.getHyenaType().mapToFilterType(),
+                filterWithOperator.getLeft());
     }
 }

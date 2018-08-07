@@ -255,7 +255,7 @@ public class HyenaPredicatesUtilUnitTest
                     column1,
                     Domain.create(SortedRangeSet.copyOf(U64Type.U_64_TYPE, Arrays.asList(range1, range2)), false));
             Range range3 = Range.equal(VarcharType.VARCHAR, Slices.utf8Slice("value1"));
-            Range range4 = Range.equal(VarcharType.VARCHAR, Slices.utf8Slice("%value2"));
+            Range range4 = Range.equal(VarcharType.VARCHAR, Slices.utf8Slice(ENDS_WITH_CHAR + "value2"));
             domainMap.put(
                     column2,
                     Domain.create(SortedRangeSet.copyOf(VarcharType.VARCHAR, Arrays.asList(range3, range4)), false));
@@ -314,7 +314,7 @@ public class HyenaPredicatesUtilUnitTest
                             VarcharType.VARCHAR,
                             BlockType.StringDense,
                             0),
-                    Domain.singleValue(VarcharType.VARCHAR, Slices.utf8Slice("%asd%")));
+                    Domain.singleValue(VarcharType.VARCHAR, Slices.utf8Slice(CONTAINS_CHAR + "asd")));
             TupleDomain<HyenaColumnHandle> tupleDomain = TupleDomain.withColumnDomains(domainMap);
 
             ScanOrFilters filters = predicatesUtil.predicateToFilters(tupleDomain);
@@ -336,7 +336,7 @@ public class HyenaPredicatesUtilUnitTest
                             VarcharType.VARCHAR,
                             BlockType.StringDense,
                             0),
-                    Domain.singleValue(VarcharType.VARCHAR, Slices.utf8Slice("%asd")));
+                    Domain.singleValue(VarcharType.VARCHAR, Slices.utf8Slice(ENDS_WITH_CHAR + "asd")));
             TupleDomain<HyenaColumnHandle> tupleDomain = TupleDomain.withColumnDomains(domainMap);
 
             ScanOrFilters filters = predicatesUtil.predicateToFilters(tupleDomain);
@@ -348,6 +348,10 @@ public class HyenaPredicatesUtilUnitTest
             assertEquals(filters.get(0).get(0).getValue(), "asd");
         }
 
+        private static final Character STARTS_WITH_CHAR = 0x11;
+        private static final Character ENDS_WITH_CHAR = 0x12;
+        private static final Character CONTAINS_CHAR = 0x13;
+
         @Test
         public void endWildcardedString()
         {
@@ -358,7 +362,7 @@ public class HyenaPredicatesUtilUnitTest
                             VarcharType.VARCHAR,
                             BlockType.StringDense,
                             0),
-                    Domain.singleValue(VarcharType.VARCHAR, Slices.utf8Slice("asd%")));
+                    Domain.singleValue(VarcharType.VARCHAR, Slices.utf8Slice(STARTS_WITH_CHAR + "asd")));
             TupleDomain<HyenaColumnHandle> tupleDomain = TupleDomain.withColumnDomains(domainMap);
 
             ScanOrFilters filters = predicatesUtil.predicateToFilters(tupleDomain);

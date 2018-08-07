@@ -381,6 +381,8 @@
                     <configuration>
                         <excludes combine.children="append">
                             <exclude>**/LikeHackUtility.java</exclude>
+                            <exclude>**/LikeHackUtilityTest.java</exclude>
+                            <exclude>**/TestRemoveEscapeSigns.java</exclude>
                         </excludes>
                     </configuration>
                 </plugin>
