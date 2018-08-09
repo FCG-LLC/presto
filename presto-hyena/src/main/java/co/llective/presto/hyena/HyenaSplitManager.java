@@ -13,7 +13,6 @@
  */
 package co.llective.presto.hyena;
 
-import co.llective.hyena.api.PartitionInfo;
 import co.llective.presto.hyena.util.TimeBoundaries;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ConnectorSplit;
@@ -24,13 +23,9 @@ import com.facebook.presto.spi.Node;
 import com.facebook.presto.spi.NodeManager;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
-import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.TupleDomain;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.UnsignedLong;
 import io.airlift.log.Logger;
-import org.apache.commons.lang3.tuple.Pair;
 
 import javax.inject.Inject;
 
@@ -60,72 +55,7 @@ public class HyenaSplitManager
         this.hyenaSession = requireNonNull(session, "hyenaSession is null");
     }
 
-    public List<Pair<Long, Long>> extractAllowedTimestampRanges(TupleDomain.ColumnDomain<HyenaColumnHandle> tsDomain)
-    {
-        return tsDomain.getDomain().getValues().getValuesProcessor().transform(
-                ranges -> {
-                    ImmutableSet.Builder<Object> columnValues = ImmutableSet.builder();
-                    List<Pair<Long, Long>> tsRanges = new ArrayList<>();
-
-                    for (Range range : ranges.getOrderedRanges()) {
-                        if (range.isSingleValue()) {
-                            tsRanges.add(Pair.of((Long) range.getSingleValue(), (Long) range.getSingleValue()));
-                        }
-                        else {
-                            Long low = null;
-                            Long high = null;
-
-                            if (range.getHigh().getValueBlock().isPresent()) {
-                                high = (Long) range.getHigh().getValue();
-                            }
-                            if (range.getLow().getValueBlock().isPresent()) {
-                                low = (Long) range.getLow().getValue();
-                            }
-
-                            if (low != null || high != null) {
-                                tsRanges.add(Pair.of(low, high));
-                            }
-                        }
-                    }
-
-                    return tsRanges;
-                },
-                discreteValues -> {
-                    if (discreteValues.isWhiteList()) {
-                        List<Pair<Long, Long>> tsRanges = new ArrayList<>();
-                        for (Object v : discreteValues.getValues()) {
-                            tsRanges.add(Pair.of((Long) v, (Long) v));
-                        }
-                        return tsRanges;
-                    }
-                    return ImmutableList.of();
-                },
-                allOrNone -> ImmutableList.of());
-    }
-
-    public boolean prunePartitionOnTs(PartitionInfo partitionInfo, List<Pair<Long, Long>> allowedTsRanges)
-    {
-        if (allowedTsRanges.isEmpty()) {
-            // Allow anything it ts included in filters
-            return false;
-        }
-
-        for (Pair<Long, Long> range : allowedTsRanges) {
-            Long practicalLeft = range.getLeft() == null ? 0L : range.getLeft();
-            Long practicalRight = range.getRight() == null ? Long.MAX_VALUE : range.getRight();
-
-            if (partitionInfo.getMinTs() <= practicalRight && partitionInfo.getMaxTs() >= practicalLeft) {
-                return false; // cannot prune, the range overlaps
-            }
-        }
-
-        // Nothing matched
-        log.info("Pruned partition %d with TS range %d-%d", partitionInfo.getId(), partitionInfo.getMinTs(), partitionInfo.getMaxTs());
-        return true;
-    }
-
     private static final int CHUNKS_NO = 5;
-    private static final long CHUNK_WIDTH_US = TimeUnit.HOURS.toMicros(1);
 
     @Override
     public ConnectorSplitSource getSplits(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorTableLayoutHandle layout, SplitSchedulingStrategy splitSchedulingStrategy)
@@ -139,23 +69,20 @@ public class HyenaSplitManager
 
         HyenaPredicatesUtil predicatesUtil = new HyenaPredicatesUtil();
         Optional<TimeBoundaries> timeRange = predicatesUtil.getTsConstraints(effectivePredicate);
+        List<ConnectorSplit> splits;
         if (timeRange.isPresent()) {
-            List<TimeBoundaries> splitBoundaries = splitTimeBoundaries2(timeRange.get());
-            List<HyenaSplit> splits = splitBoundaries.stream()
+            List<TimeBoundaries> splitBoundaries = splitTimeBoundaries(timeRange.get());
+            splits = splitBoundaries.stream()
                         .map(timeBoundaries -> new HyenaSplit(currentNode.getHostAndPort(), effectivePredicate, Optional.of(timeBoundaries)))
                         .collect(Collectors.toList());
-
-            return new FixedSplitSource(splits);
+        } else {
+            splits = Collections.singletonList(new HyenaSplit(currentNode.getHostAndPort(), effectivePredicate, Optional.empty()));
         }
-
-        //TODO: Right now it's single split which causes all resulting data (after pushed-down filters) land in RAM.
-        //TODO: We need to create splits based on source and multiple time ranges.
-        List<ConnectorSplit> splits = Collections.singletonList(new HyenaSplit(currentNode.getHostAndPort(), effectivePredicate, Optional.empty()));
 
         return new FixedSplitSource(splits);
     }
 
-    private List<TimeBoundaries> splitTimeBoundaries2(TimeBoundaries timeRange)
+    private List<TimeBoundaries> splitTimeBoundaries(TimeBoundaries timeRange)
     {
         Long min = timeRange.getStart();
         Long max = timeRange.getEnd();
@@ -176,22 +103,6 @@ public class HyenaSplitManager
 
         long offset = (max - min) / CHUNKS_NO;
 
-        for (int i = 0; i < CHUNKS_NO - 1; i++) {
-            TimeBoundaries splitTimeBoundaries = TimeBoundaries.of(min + i * offset, min + (i + 1) * offset);
-            splitBoundaries.add(splitTimeBoundaries);
-        }
-        // in case of some modulo left
-        splitBoundaries.add(TimeBoundaries.of(min + (CHUNKS_NO - 1) * offset, max));
-        return splitBoundaries;
-    }
-
-    private List<TimeBoundaries> splitTimeBoundaries(TimeBoundaries timeRange)
-    {
-        Long min = timeRange.getStart();
-        Long max = timeRange.getEnd();
-        long offset = (max - min) / CHUNKS_NO;
-
-        List<TimeBoundaries> splitBoundaries = new ArrayList<>(CHUNKS_NO);
         for (int i = 0; i < CHUNKS_NO - 1; i++) {
             TimeBoundaries splitTimeBoundaries = TimeBoundaries.of(min + i * offset, min + (i + 1) * offset);
             splitBoundaries.add(splitTimeBoundaries);
