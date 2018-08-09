@@ -32,6 +32,18 @@ public class HyenaConfig
     public static final String STREAMING_RECORDS_THRESHOLD = "streaming_records_threshold";
     public static final String STREAMING_RECORDS_THRESHOLD_DESC = "Number of records which hyena can add/subtract to/from limit number";
 
+    private Boolean splittingEnabled = true;
+    public static final String SPLITTING_ENABLED = "splitting_enabled";
+    public static final String SPLITTING_ENABLED_DESC = "Should use multiple splits while scanning";
+
+    private Integer numberOfSplits = 5;
+    public static final String NUMBER_OF_SPLITS = "number_of_splits";
+    public static final String NUMBER_OF_SPLITS_DESC = "Defines how many parallel scans should be fired up";
+
+    private Long minDbTimestampNs = 1533074400000000L;  //2018-08-01
+    public static final String MIN_DB_TIMESTAMP = "min_db_timestamp_ns";
+    public static final String MIN_DB_TIMESTAMP_DESC = "Lowest timestamp in database in nanoseconds (only used when someone gives no constraints on time in query)";
+
     public String getHyenaHost()
     {
         return hyenaHost;
@@ -50,6 +62,21 @@ public class HyenaConfig
     public long getStreamingRecordsThreshold()
     {
         return streamingRecordsThreshold;
+    }
+
+    public boolean getSplittingEnabled()
+    {
+        return splittingEnabled;
+    }
+
+    public int getNumberOfSplits()
+    {
+        return numberOfSplits;
+    }
+
+    public long getMinDbTimestampNs()
+    {
+        return minDbTimestampNs;
     }
 
     @Config("hyena.url")
@@ -81,6 +108,30 @@ public class HyenaConfig
     public HyenaConfig setStreamingRecordsThreshold(Long threshold)
     {
         this.streamingRecordsThreshold = threshold;
+        return this;
+    }
+
+    @Config("hyena." + SPLITTING_ENABLED)
+    @ConfigDescription(SPLITTING_ENABLED_DESC)
+    public HyenaConfig setSplittingEnabled(Boolean splittingEnabled)
+    {
+        this.splittingEnabled = splittingEnabled;
+        return this;
+    }
+
+    @Config("hyena." + NUMBER_OF_SPLITS)
+    @ConfigDescription(NUMBER_OF_SPLITS_DESC)
+    public HyenaConfig setNumberOfSplits(Integer numberOfSplits)
+    {
+        this.numberOfSplits = numberOfSplits;
+        return this;
+    }
+
+    @Config("hyena." + MIN_DB_TIMESTAMP)
+    @ConfigDescription(MIN_DB_TIMESTAMP_DESC)
+    public HyenaConfig setMinDbTimestampNs(Long timestamp)
+    {
+        this.minDbTimestampNs = timestamp;
         return this;
     }
 }

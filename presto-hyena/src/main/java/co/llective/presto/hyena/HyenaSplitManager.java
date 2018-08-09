@@ -46,6 +46,10 @@ public class HyenaSplitManager
     private final NodeManager nodeManager;
     private final HyenaSession hyenaSession;
 
+    private long dbMinTimestamp;
+    private boolean isSplittingEnabled;
+    private int numberOfSplits;
+
     @Inject
     public HyenaSplitManager(
             NodeManager nodeManager,
@@ -55,11 +59,17 @@ public class HyenaSplitManager
         this.hyenaSession = requireNonNull(session, "hyenaSession is null");
     }
 
-    private static final int CHUNKS_NO = 5;
+    private void setSplittingOptions(ConnectorSession session)
+    {
+        this.isSplittingEnabled = HyenaConnectorSessionProperties.getSplittingEnabled(session);
+        this.numberOfSplits = HyenaConnectorSessionProperties.getNumberOfSplits(session);
+        this.dbMinTimestamp = HyenaConnectorSessionProperties.getMinDbTimestampNs(session);
+    }
 
     @Override
     public ConnectorSplitSource getSplits(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorTableLayoutHandle layout, SplitSchedulingStrategy splitSchedulingStrategy)
     {
+        setSplittingOptions(session);
         HyenaTableLayoutHandle layoutHandle = (HyenaTableLayoutHandle) layout;
 
         TupleDomain<HyenaColumnHandle> effectivePredicate = layoutHandle.getConstraint()
@@ -70,12 +80,13 @@ public class HyenaSplitManager
         HyenaPredicatesUtil predicatesUtil = new HyenaPredicatesUtil();
         Optional<TimeBoundaries> timeRange = predicatesUtil.getTsConstraints(effectivePredicate);
         List<ConnectorSplit> splits;
-        if (timeRange.isPresent()) {
+        if (isSplittingEnabled && timeRange.isPresent()) {
             List<TimeBoundaries> splitBoundaries = splitTimeBoundaries(timeRange.get());
             splits = splitBoundaries.stream()
                         .map(timeBoundaries -> new HyenaSplit(currentNode.getHostAndPort(), effectivePredicate, Optional.of(timeBoundaries)))
                         .collect(Collectors.toList());
-        } else {
+        }
+        else {
             splits = Collections.singletonList(new HyenaSplit(currentNode.getHostAndPort(), effectivePredicate, Optional.empty()));
         }
 
@@ -92,7 +103,7 @@ public class HyenaSplitManager
         if (min == null) {
             // -inf
             //TODO: change to min value of record in DB
-            min = 1531138692090000L;
+            min = dbMinTimestamp;
             splitBoundaries.add(TimeBoundaries.of(0L, min));
         }
         if (max == null) {
@@ -101,14 +112,14 @@ public class HyenaSplitManager
             // +inf
         }
 
-        long offset = (max - min) / CHUNKS_NO;
+        long offset = (max - min) / numberOfSplits;
 
-        for (int i = 0; i < CHUNKS_NO - 1; i++) {
+        for (int i = 0; i < numberOfSplits - 1; i++) {
             TimeBoundaries splitTimeBoundaries = TimeBoundaries.of(min + i * offset, min + (i + 1) * offset);
             splitBoundaries.add(splitTimeBoundaries);
         }
         // in case of some modulo left
-        splitBoundaries.add(TimeBoundaries.of(min + (CHUNKS_NO - 1) * offset, max));
+        splitBoundaries.add(TimeBoundaries.of(min + (numberOfSplits - 1) * offset, max));
         return splitBoundaries;
     }
 }
