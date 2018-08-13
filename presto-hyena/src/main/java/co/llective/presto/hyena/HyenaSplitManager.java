@@ -24,6 +24,7 @@ import com.facebook.presto.spi.NodeManager;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.predicate.TupleDomain;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.primitives.UnsignedLong;
 import io.airlift.log.Logger;
 
@@ -46,9 +47,9 @@ public class HyenaSplitManager
     private final NodeManager nodeManager;
     private final HyenaSession hyenaSession;
 
-    private long dbMinTimestamp;
+    @VisibleForTesting long dbMinTimestamp;
     private boolean isSplittingEnabled;
-    private int numberOfSplits;
+    @VisibleForTesting int numberOfSplits;
 
     @Inject
     public HyenaSplitManager(
@@ -94,7 +95,7 @@ public class HyenaSplitManager
         return new FixedSplitSource(splits);
     }
 
-    private List<TimeBoundaries> splitTimeBoundaries(TimeBoundaries timeRange)
+    @VisibleForTesting List<TimeBoundaries> splitTimeBoundaries(TimeBoundaries timeRange)
     {
         Long min = timeRange.getStart();
         Long max = timeRange.getEnd();
@@ -108,7 +109,7 @@ public class HyenaSplitManager
             splitBoundaries.add(TimeBoundaries.of(0L, min));
         }
         if (max == null) {
-            max = (System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(10)) * 1000;
+            max = getArtificialMaxTime();
             splitBoundaries.add(TimeBoundaries.of(max, UnsignedLong.MAX_VALUE.longValue()));
             // +inf
         }
@@ -122,5 +123,14 @@ public class HyenaSplitManager
         // in case of some modulo left
         splitBoundaries.add(TimeBoundaries.of(min + (numberOfSplits - 1) * offset, max));
         return splitBoundaries;
+    }
+
+    /**
+     * Calculates artificial max time which is pointing into some time in the future.
+     * @return timestamp in nanos
+     */
+    @VisibleForTesting long getArtificialMaxTime()
+    {
+        return (System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(10)) * 1000;
     }
 }
