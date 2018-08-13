@@ -31,4 +31,13 @@ public class TimeBoundaries
     {
         return end;
     }
+
+    @Override
+    public String toString()
+    {
+        return "TimeBoundaries{" +
+                "start=" + start +
+                ", end=" + end +
+                '}';
+    }
 }

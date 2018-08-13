@@ -152,7 +152,6 @@ public class HyenaPredicatesUtil
 
         // handle = situation
         if (range.isSingleValue()) {
-            //TODO: split string%string case
             ScanFilter singleFilter = createSingleFilter(column, ScanComparison.Eq, range.getSingleValue());
             andFilters.add(singleFilter);
         }

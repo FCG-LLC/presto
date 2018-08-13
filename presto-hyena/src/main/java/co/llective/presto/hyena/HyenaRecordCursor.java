@@ -112,24 +112,7 @@ public class HyenaRecordCursor
 
         ScanOrFilters filters = predicateHandler.predicateToFilters(predicate);
 
-        if (timeBoundaries.isPresent()) {
-            log.info("Time boundaries is present");
-        }
-        else {
-            log.info("Time boundaries is not present");
-        }
-        timeBoundaries.ifPresent(timeBoundaries1 -> filters.forEach(x -> x.stream().filter(y -> y.getColumn() == 0).forEach(
-                y -> {
-                    log.info("I'm checking time boundaries");
-                    if (y.getOp().equals(ScanComparison.Gt) || y.getOp().equals(ScanComparison.GtEq) && (Long) y.getValue() < timeBoundaries1.getStart()) {
-                        log.info("I'm setting low boundary to " + timeBoundaries1.getStart());
-                        y.setValue(timeBoundaries1.getStart());
-                    }
-                    else if (y.getOp().equals(ScanComparison.Lt) || y.getOp().equals(ScanComparison.LtEq) && (Long) y.getValue() > timeBoundaries1.getEnd()) {
-                        log.info("I'm setting high boundary to " + timeBoundaries1.getEnd());
-                        y.setValue(timeBoundaries1.getEnd());
-                    }
-                })));
+        applyBoundariesToTimestampFilters(timeBoundaries, filters);
 
         req.getFilters().addAll(filters);
 
@@ -144,6 +127,24 @@ public class HyenaRecordCursor
         log.info("Filters: " + StringUtils.join(req.getFilters(), ", "));
 
         return req;
+    }
+
+    /**
+     * Applies time boundaries to timestamp filters if those exist.
+     * @param timeBoundaries time boundaries for split
+     * @param filters filters built for current scan
+     */
+    private void applyBoundariesToTimestampFilters(Optional<TimeBoundaries> timeBoundaries, ScanOrFilters filters)
+    {
+        timeBoundaries.ifPresent(timeBoundaries1 -> filters.forEach(x -> x.stream().filter(y -> y.getColumn() == 0).forEach(
+                y -> {
+                    if (y.getOp().equals(ScanComparison.Gt) || y.getOp().equals(ScanComparison.GtEq) && (Long) y.getValue() < timeBoundaries1.getStart()) {
+                        y.setValue(timeBoundaries1.getStart());
+                    }
+                    else if (y.getOp().equals(ScanComparison.Lt) || y.getOp().equals(ScanComparison.LtEq) && (Long) y.getValue() > timeBoundaries1.getEnd()) {
+                        y.setValue(timeBoundaries1.getEnd());
+                    }
+                })));
     }
 
     /**
@@ -298,7 +299,7 @@ public class HyenaRecordCursor
     @Override
     public long getLong(int field)
     {
-        // TODO: temporal workaround for not filled source_id by hyena (we only have packet_headers now)
+        // TODO: temporal workaround for not filled source_id by hyena (we only have one source now)
         if (columns.get(field).getColumnName().equals("source_id")) {
             return 1L;
         }

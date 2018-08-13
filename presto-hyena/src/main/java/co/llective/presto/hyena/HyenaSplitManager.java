@@ -85,6 +85,7 @@ public class HyenaSplitManager
             splits = splitBoundaries.stream()
                         .map(timeBoundaries -> new HyenaSplit(currentNode.getHostAndPort(), effectivePredicate, Optional.of(timeBoundaries)))
                         .collect(Collectors.toList());
+            log.debug("Created " + splits.size() + " splits for query (" + splitBoundaries + ")");
         }
         else {
             splits = Collections.singletonList(new HyenaSplit(currentNode.getHostAndPort(), effectivePredicate, Optional.empty()));
@@ -107,7 +108,7 @@ public class HyenaSplitManager
             splitBoundaries.add(TimeBoundaries.of(0L, min));
         }
         if (max == null) {
-            max = (System.currentTimeMillis() + TimeUnit.MINUTES.toNanos(10)) * 1000;
+            max = (System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(10)) * 1000;
             splitBoundaries.add(TimeBoundaries.of(max, UnsignedLong.MAX_VALUE.longValue()));
             // +inf
         }
