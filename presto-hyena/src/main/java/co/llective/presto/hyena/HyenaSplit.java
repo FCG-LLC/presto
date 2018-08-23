@@ -13,6 +13,7 @@
  */
 package co.llective.presto.hyena;
 
+import co.llective.presto.hyena.util.TimeBoundaries;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.predicate.TupleDomain;
@@ -21,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 
 import java.util.List;
+import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
@@ -30,14 +32,17 @@ public class HyenaSplit
 {
     private final HostAddress address;
     private final TupleDomain<HyenaColumnHandle> effectivePredicate;
+    private final Optional<TimeBoundaries> timeBoundaries;
 
     @JsonCreator
     public HyenaSplit(
             @JsonProperty("address") HostAddress address,
-            @JsonProperty("effectivePredicate") TupleDomain<HyenaColumnHandle> effectivePredicate)
+            @JsonProperty("effectivePredicate") TupleDomain<HyenaColumnHandle> effectivePredicate,
+            @JsonProperty("timeBoundaries") Optional<TimeBoundaries> timeBoundaries)
     {
         this.address = requireNonNull(address, "address is null");
         this.effectivePredicate = requireNonNull(effectivePredicate, "effectivePredicate is null");
+        this.timeBoundaries = requireNonNull(timeBoundaries);
     }
 
     @JsonProperty
@@ -50,6 +55,12 @@ public class HyenaSplit
     public TupleDomain<HyenaColumnHandle> getEffectivePredicate()
     {
         return effectivePredicate;
+    }
+
+    @JsonProperty
+    public Optional<TimeBoundaries> getTimeBoundaries()
+    {
+        return timeBoundaries;
     }
 
     @Override

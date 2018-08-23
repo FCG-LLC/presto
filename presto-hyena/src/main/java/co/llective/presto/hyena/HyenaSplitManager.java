@@ -13,7 +13,7 @@
  */
 package co.llective.presto.hyena;
 
-import co.llective.hyena.api.PartitionInfo;
+import co.llective.presto.hyena.util.TimeBoundaries;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.ConnectorSplitSource;
@@ -23,18 +23,19 @@ import com.facebook.presto.spi.Node;
 import com.facebook.presto.spi.NodeManager;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
-import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.TupleDomain;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.primitives.UnsignedLong;
 import io.airlift.log.Logger;
-import org.apache.commons.lang3.tuple.Pair;
 
 import javax.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
@@ -46,6 +47,10 @@ public class HyenaSplitManager
     private final NodeManager nodeManager;
     private final HyenaSession hyenaSession;
 
+    @VisibleForTesting long dbMinTimestamp;
+    private boolean isSplittingEnabled;
+    @VisibleForTesting int numberOfSplits;
+
     @Inject
     public HyenaSplitManager(
             NodeManager nodeManager,
@@ -55,73 +60,17 @@ public class HyenaSplitManager
         this.hyenaSession = requireNonNull(session, "hyenaSession is null");
     }
 
-    public List<Pair<Long, Long>> extractAllowedTimestampRanges(TupleDomain.ColumnDomain<HyenaColumnHandle> tsDomain)
+    private void setSplittingOptions(ConnectorSession session)
     {
-        return tsDomain.getDomain().getValues().getValuesProcessor().transform(
-                ranges -> {
-                    ImmutableSet.Builder<Object> columnValues = ImmutableSet.builder();
-                    List<Pair<Long, Long>> tsRanges = new ArrayList<>();
-
-                    for (Range range : ranges.getOrderedRanges()) {
-                        if (range.isSingleValue()) {
-                            tsRanges.add(Pair.of((Long) range.getSingleValue(), (Long) range.getSingleValue()));
-                        }
-                        else {
-                            Long low = null;
-                            Long high = null;
-
-                            if (range.getHigh().getValueBlock().isPresent()) {
-                                high = (Long) range.getHigh().getValue();
-                            }
-                            if (range.getLow().getValueBlock().isPresent()) {
-                                low = (Long) range.getLow().getValue();
-                            }
-
-                            if (low != null || high != null) {
-                                tsRanges.add(Pair.of(low, high));
-                            }
-                        }
-                    }
-
-                    return tsRanges;
-                },
-                discreteValues -> {
-                    if (discreteValues.isWhiteList()) {
-                        List<Pair<Long, Long>> tsRanges = new ArrayList<>();
-                        for (Object v : discreteValues.getValues()) {
-                            tsRanges.add(Pair.of((Long) v, (Long) v));
-                        }
-                        return tsRanges;
-                    }
-                    return ImmutableList.of();
-                },
-                allOrNone -> ImmutableList.of());
-    }
-
-    public boolean prunePartitionOnTs(PartitionInfo partitionInfo, List<Pair<Long, Long>> allowedTsRanges)
-    {
-        if (allowedTsRanges.isEmpty()) {
-            // Allow anything it ts included in filters
-            return false;
-        }
-
-        for (Pair<Long, Long> range : allowedTsRanges) {
-            Long practicalLeft = range.getLeft() == null ? 0L : range.getLeft();
-            Long practicalRight = range.getRight() == null ? Long.MAX_VALUE : range.getRight();
-
-            if (partitionInfo.getMinTs() <= practicalRight && partitionInfo.getMaxTs() >= practicalLeft) {
-                return false; // cannot prune, the range overlaps
-            }
-        }
-
-        // Nothing matched
-        log.info("Pruned partition %d with TS range %d-%d", partitionInfo.getId(), partitionInfo.getMinTs(), partitionInfo.getMaxTs());
-        return true;
+        this.isSplittingEnabled = HyenaConnectorSessionProperties.getSplittingEnabled(session);
+        this.numberOfSplits = HyenaConnectorSessionProperties.getNumberOfSplits(session);
+        this.dbMinTimestamp = HyenaConnectorSessionProperties.getMinDbTimestampNs(session);
     }
 
     @Override
     public ConnectorSplitSource getSplits(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorTableLayoutHandle layout, SplitSchedulingStrategy splitSchedulingStrategy)
     {
+        setSplittingOptions(session);
         HyenaTableLayoutHandle layoutHandle = (HyenaTableLayoutHandle) layout;
 
         TupleDomain<HyenaColumnHandle> effectivePredicate = layoutHandle.getConstraint()
@@ -129,10 +78,59 @@ public class HyenaSplitManager
 
         Node currentNode = nodeManager.getCurrentNode();
 
-        //TODO: Right now it's single split which causes all resulting data (after pushed-down filters) land in RAM.
-        //TODO: We need to create splits based on source and multiple time ranges.
-        List<ConnectorSplit> splits = Collections.singletonList(new HyenaSplit(currentNode.getHostAndPort(), effectivePredicate));
+        HyenaPredicatesUtil predicatesUtil = new HyenaPredicatesUtil();
+        Optional<TimeBoundaries> timeRange = predicatesUtil.getTsConstraints(effectivePredicate);
+        List<ConnectorSplit> splits;
+        if (isSplittingEnabled && timeRange.isPresent()) {
+            List<TimeBoundaries> splitBoundaries = splitTimeBoundaries(timeRange.get());
+            splits = splitBoundaries.stream()
+                        .map(timeBoundaries -> new HyenaSplit(currentNode.getHostAndPort(), effectivePredicate, Optional.of(timeBoundaries)))
+                        .collect(Collectors.toList());
+            log.debug("Created " + splits.size() + " splits for query (" + splitBoundaries + ")");
+        }
+        else {
+            splits = Collections.singletonList(new HyenaSplit(currentNode.getHostAndPort(), effectivePredicate, Optional.empty()));
+        }
 
         return new FixedSplitSource(splits);
+    }
+
+    @VisibleForTesting List<TimeBoundaries> splitTimeBoundaries(TimeBoundaries timeRange)
+    {
+        Long min = timeRange.getStart();
+        Long max = timeRange.getEnd();
+
+        List<TimeBoundaries> splitBoundaries = new ArrayList<>();
+
+        if (min == null) {
+            // -inf
+            //TODO: change to min value of record in DB
+            min = dbMinTimestamp;
+            splitBoundaries.add(TimeBoundaries.of(0L, min));
+        }
+        if (max == null) {
+            max = getArtificialMaxTime();
+            splitBoundaries.add(TimeBoundaries.of(max, UnsignedLong.MAX_VALUE.longValue()));
+            // +inf
+        }
+
+        long offset = (max - min) / numberOfSplits;
+
+        for (int i = 0; i < numberOfSplits - 1; i++) {
+            TimeBoundaries splitTimeBoundaries = TimeBoundaries.of(min + i * offset, min + (i + 1) * offset);
+            splitBoundaries.add(splitTimeBoundaries);
+        }
+        // in case of some modulo left
+        splitBoundaries.add(TimeBoundaries.of(min + (numberOfSplits - 1) * offset, max));
+        return splitBoundaries;
+    }
+
+    /**
+     * Calculates artificial max time which is pointing into some time in the future.
+     * @return timestamp in nanos
+     */
+    @VisibleForTesting long getArtificialMaxTime()
+    {
+        return (System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(10)) * 1000;
     }
 }
